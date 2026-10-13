@@ -15,6 +15,54 @@ function deriveAutomationState(settings, gmail) {
   return 'ativa';
 }
 
+// Diagnóstico claro do que está impedindo o envio de e-mails.
+export function computeReadiness(db, settings, gmail) {
+  const activeAutomations = db
+    .prepare("SELECT COUNT(*) AS c FROM automations WHERE status = 'active'").get().c;
+  const enabledServices = db
+    .prepare('SELECT COUNT(*) AS c FROM services WHERE enabled = 1').get().c;
+  const checks = [
+    {
+      key: 'gmail_connected',
+      ok: Boolean(gmail.connected),
+      label: 'Conta Gmail conectada',
+      fix: 'Vá em “Integração Gmail” e conecte a conta (OAuth).',
+    },
+    {
+      key: 'recipient',
+      ok: Boolean(settings.authorized_recipient),
+      label: 'Destinatário autorizado definido',
+      fix: 'Defina o e-mail autorizado em Configurações ou no assistente.',
+    },
+    {
+      key: 'auto_mode',
+      ok: Boolean(settings.auto_mode),
+      label: 'Modo automático ligado',
+      fix: 'Ligue o modo automático no Dashboard ou no assistente.',
+    },
+    {
+      key: 'automation_active',
+      ok: activeAutomations > 0,
+      label: 'Automação ativa',
+      fix: 'Ative uma automação em “Automações” (ou conclua o assistente com o modo automático ligado).',
+    },
+    {
+      key: 'services_enabled',
+      ok: enabledServices > 0,
+      label: 'Serviços habilitados',
+      fix: 'Habilite ao menos um serviço (o assistente faz isso automaticamente).',
+    },
+    {
+      key: 'not_emergency',
+      ok: !settings.emergency_stop,
+      label: 'Sem parada de emergência',
+      fix: 'Libere a parada de emergência no Dashboard.',
+    },
+  ];
+  const blockers = checks.filter((c) => !c.ok);
+  return { ready: blockers.length === 0, checks, blockers };
+}
+
 const router = Router();
 router.use(requireAuth);
 
@@ -100,12 +148,20 @@ router.get('/dashboard', (req, res) => {
     byCategory,
     gmail,
     runtime,
+    readiness: computeReadiness(db, settings, gmail),
     automationState: deriveAutomationState(settings, gmail),
     settings: (() => {
       const { google_client_secret, ...rest } = settings;
       return { ...rest, google_client_secret_set: Boolean(google_client_secret) };
     })(),
   });
+});
+
+// Prontidão para envio: lista exatamente o que falta para os e-mails saírem.
+router.get('/readiness', (req, res) => {
+  const settings = getSettings();
+  const gmail = { ...gmailStatus(), configured: gmailConfigured(settings) };
+  res.json(computeReadiness(db, settings, gmail));
 });
 
 // Activity log (reports).

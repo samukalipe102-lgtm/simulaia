@@ -75,7 +75,7 @@ export default function Dashboard() {
   if (error) return <p className="text-red-600">{error}</p>;
   if (!data) return <Spinner />;
 
-  const { statusCounts, totals, conversations, lastExecutions, recentFailures, nextRun, byCategory, gmail, runtime, automationState, settings } = data;
+  const { statusCounts, totals, conversations, lastExecutions, recentFailures, nextRun, byCategory, gmail, runtime, automationState, settings, readiness } = data;
   const categoryData = byCategory.map((c) => ({ name: c.category, value: c.c }));
   const st = AUTO_STATE[automationState] || AUTO_STATE.configuracao_pendente;
 
@@ -107,6 +107,35 @@ export default function Dashboard() {
         <Card className="p-5 flex items-center justify-between flex-wrap gap-3 border-amber-200 bg-amber-50">
           <div className="text-sm text-amber-800">Conecte a conta de Gmail para o sistema começar a operar.</div>
           <Button onClick={() => navigate('/gmail')}>Conectar Gmail</Button>
+        </Card>
+      )}
+
+      {/* Readiness: o que falta para os e-mails serem enviados */}
+      {readiness && !readiness.ready && (
+        <Card className="border-amber-200">
+          <CardHeader title="⚠️ Pendências para enviar e-mails" subtitle="Resolva os itens abaixo para o sistema começar a enviar" />
+          <div className="p-5 space-y-2">
+            {readiness.checks.map((c) => (
+              <div key={c.key} className="flex items-start gap-2 text-sm">
+                <span>{c.ok ? '✅' : '❌'}</span>
+                <div>
+                  <span className={c.ok ? 'text-slate-700' : 'text-slate-800 font-medium'}>{c.label}</span>
+                  {!c.ok && <div className="text-xs text-amber-700">{c.fix}</div>}
+                </div>
+              </div>
+            ))}
+            <div className="pt-2 flex gap-2">
+              <Button onClick={() => navigate('/setup')}>Abrir assistente</Button>
+              {!gmail.connected && <Button variant="secondary" onClick={() => navigate('/gmail')}>Conectar Gmail</Button>}
+            </div>
+          </div>
+        </Card>
+      )}
+      {readiness && readiness.ready && (
+        <Card className="border-emerald-200 bg-emerald-50">
+          <div className="p-4 text-sm text-emerald-800">
+            ✅ Tudo pronto para enviar. O sistema vai gerar e enviar os e-mails ao destinatário autorizado conforme as regras.
+          </div>
         </Card>
       )}
 

@@ -34,7 +34,11 @@ export default function Conversations() {
 
   async function loadList() {
     const all = await api.get('/requests');
-    const convos = all.filter((r) => r.gmail_thread_id);
+    // Mostra conversas já iniciadas (com thread) E solicitações geradas que ainda
+    // aguardam envio (para o "Enviar agora" ficar acessível aqui).
+    const convos = all.filter(
+      (r) => r.gmail_thread_id || ['generated', 'scheduled', 'error'].includes(r.status),
+    );
     setRows(convos);
     if (!selId && convos.length) setSelId(convos[0].id);
   }
