@@ -88,7 +88,14 @@ Isso libera o envio e o recebimento real de e-mails. É só seguir clicando.
 ## Dúvidas comuns
 
 - **"redirect_uri_mismatch"** ao conectar o Gmail → o URI no Google Cloud não é
-  idêntico ao `GOOGLE_REDIRECT_URI` do `.env`. Copie e cole exatamente igual.
+  idêntico ao usado pelo app. No desktop, cadastre exatamente
+  `http://127.0.0.1:4137/api/gmail/oauth/callback`.
+- **"Erro 403: org_internal — só pode ser usado dentro da organização"** → a tela
+  de consentimento OAuth foi criada como **Interna**. Vá em **Tela de permissão
+  OAuth** e **mude o tipo para Externo** (botão “Tornar externo”), depois adicione
+  seu e-mail em **Usuários de teste**. Se não existir a opção de tornar externo
+  (projeto dentro de uma organização Workspace), crie o projeto OAuth usando uma
+  **conta Gmail comum** (não-Workspace) e refaça as credenciais.
 - **"Acesso bloqueado / app não verificado"** → confirme que você se adicionou em
   **Usuários de teste** na tela de consentimento.
 - **Não recebi o e-mail** → confira o **Destinatário autorizado** em Configurações e

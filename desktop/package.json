@@ -1,9 +1,10 @@
 {
   "name": "simula-escola-ia-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simula Escola IA — aplicativo de desktop (Windows) via Electron.",
   "author": "Simula Escola IA",
   "repository": "https://github.com/samukalipe102-lgtm/simulaia",
+  "_comment_version": "manter em sincronia com a tag de release (vX.Y.Z)",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -32,7 +33,13 @@
       {
         "from": "../server",
         "to": "server",
-        "filter": ["**/*", "!node_modules/.cache/**", "!data/**", "!tests/**", "!.env"]
+        "filter": [
+          "**/*",
+          "!node_modules/.cache/**",
+          "!data/**",
+          "!tests/**",
+          "!.env"
+        ]
       },
       {
         "from": "../client/dist",
@@ -41,8 +48,18 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.ico"
     },

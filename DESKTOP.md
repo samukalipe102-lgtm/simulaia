@@ -81,6 +81,13 @@ http://127.0.0.1:4137/api/gmail/oauth/callback
 ```
 (É a porta fixa do servidor interno do app.)
 
+### Tela de consentimento = Externo (evita o erro 403: org_internal)
+Em **Tela de permissão OAuth**, o tipo de usuário deve ser **Externo**. Se estiver
+como *Interno*, o Google bloqueia contas Gmail comuns com o erro
+`403: org_internal`. Mude para **Externo** e adicione seu e-mail em
+*Usuários de teste*. Se não houver a opção de tornar externo (projeto dentro de
+uma organização Workspace), crie o projeto OAuth em uma **conta Gmail comum**.
+
 ---
 
 ## Onde ficam os dados
