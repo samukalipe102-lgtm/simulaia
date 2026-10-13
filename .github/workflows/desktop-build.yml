@@ -11,6 +11,10 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# Necessário para o passo que cria/anexa o Release do GitHub.
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
