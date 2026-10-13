@@ -124,6 +124,16 @@ export default function Gmail() {
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
             Os tokens OAuth ficam somente no backend (banco de dados). Nunca são enviados ao navegador.
           </p>
+          <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 mt-2 space-y-1">
+            <p className="font-medium text-slate-700">Erros comuns ao conectar:</p>
+            <p><strong>redirect_uri_mismatch</strong> — a URI de redirecionamento no Google Cloud
+              precisa ser idêntica à usada pelo app. No desktop:
+              <code> http://127.0.0.1:4137/api/gmail/oauth/callback</code>.</p>
+            <p><strong>Erro 403: org_internal</strong> — a tela de consentimento foi criada como
+              <em> Interna</em>. Mude o tipo para <strong>Externo</strong> e adicione seu e-mail em
+              <em> Usuários de teste</em>. Se não houver a opção “Tornar externo”, crie o projeto
+              OAuth em uma conta Gmail comum (não-Workspace).</p>
+          </div>
         </div>
       </Card>
     </div>
