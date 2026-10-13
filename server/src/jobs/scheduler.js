@@ -9,6 +9,7 @@ import cron from 'node-cron';
 import { getSettings, log } from '../db/index.js';
 import { listActiveAutomations, runAutomationStep, updateNextRun } from '../services/automation.js';
 import { syncReplies, processConversations } from '../services/requests.js';
+import { emitEvent } from '../services/events.js';
 import { gmailConfigured } from '../config.js';
 
 let tickRunning = false;
@@ -44,6 +45,10 @@ async function tick() {
       const result = await runAutomationStep(automation.id);
       if (result.sent || result.error) {
         updateNextRun(automation.id);
+        emitEvent(result.sent ? 'request_sent' : 'request_error', {
+          automationId: automation.id,
+          requestId: result.requestId,
+        });
       }
     }
   } catch (err) {
@@ -72,11 +77,15 @@ async function syncTick() {
 
   syncRunning = true;
   try {
-    await syncReplies();
+    const synced = await syncReplies();
     runtime.lastSyncAt = new Date().toISOString();
+    if (synced?.imported > 0) {
+      emitEvent('replies_imported', { imported: synced.imported });
+    }
     // Decide next steps for conversations that just got a reply.
-    await processConversations();
+    const processed = await processConversations();
     runtime.lastConversationRunAt = new Date().toISOString();
+    emitEvent('sync', { syncedAt: runtime.lastSyncAt, ...processed });
   } catch (err) {
     runtime.lastError = err.message;
     log('error', 'scheduler', `Erro ao sincronizar/processar conversas: ${err.message}`);

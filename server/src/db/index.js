@@ -32,6 +32,11 @@ export function migrate() {
   ensureColumn('settings', 'google_client_id', 'TEXT');
   ensureColumn('settings', 'google_client_secret', 'TEXT');
 
+  // EduGestão institution identity.
+  ensureColumn('settings', 'institution_name', "TEXT NOT NULL DEFAULT 'EduGestão'");
+  ensureColumn('settings', 'institution_email', "TEXT NOT NULL DEFAULT 'adminedugestao@gmail.com'");
+  ensureColumn('settings', 'default_sector', "TEXT NOT NULL DEFAULT 'Atendimento Escolar'");
+
   // Full-automation settings (single setup + autonomous operation).
   ensureColumn('settings', 'setup_completed', 'INTEGER NOT NULL DEFAULT 0');
   // auto_mode: master switch for the end-to-end automatic flow.

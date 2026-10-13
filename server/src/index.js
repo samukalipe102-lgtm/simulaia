@@ -16,8 +16,13 @@ import automationsRoutes from './routes/automations.js';
 import gmailRoutes from './routes/gmail.js';
 import settingsRoutes from './routes/settings.js';
 import reportsRoutes from './routes/reports.js';
+import edugestaoRoutes from './routes/edugestao.js';
+import eventsRoutes from './routes/events.js';
+import { seedAll } from './services/edugestao.js';
 
 migrate();
+// Seed EduGestão catalog (processes + institutional signatures) if empty.
+seedAll();
 
 // Ensure the initial admin exists.
 function ensureAdmin() {
@@ -58,6 +63,8 @@ app.use('/api/automations', automationsRoutes);
 app.use('/api/gmail', gmailRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/edugestao', edugestaoRoutes);
+app.use('/api/events', eventsRoutes);
 
 // API 404 handler (only for /api/* paths).
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));

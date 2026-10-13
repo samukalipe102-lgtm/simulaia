@@ -15,6 +15,9 @@ import Reports from './pages/Reports.jsx';
 import Gmail from './pages/Gmail.jsx';
 import Settings from './pages/Settings.jsx';
 import Setup from './pages/Setup.jsx';
+import Students from './pages/Students.jsx';
+import Processes from './pages/Processes.jsx';
+import Signatures from './pages/Signatures.jsx';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -38,6 +41,9 @@ export default function App() {
       <Route path="/gmail" element={<Protected><Gmail /></Protected>} />
       <Route path="/configuracoes" element={<Protected><Settings /></Protected>} />
       <Route path="/setup" element={<Protected><Setup /></Protected>} />
+      <Route path="/alunos" element={<Protected><Students /></Protected>} />
+      <Route path="/processos" element={<Protected><Processes /></Protected>} />
+      <Route path="/assinaturas" element={<Protected><Signatures /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

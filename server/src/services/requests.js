@@ -9,6 +9,7 @@ import {
   classifyReply,
 } from '../ai/generator.js';
 import * as gmail from './gmail.js';
+import { applySignature } from './edugestao.js';
 
 function nextPublicId() {
   const year = new Date().getFullYear();
@@ -141,11 +142,14 @@ export async function sendRequest(requestId) {
       updated_at = datetime('now') WHERE id = ?`,
   ).run(recipient, request.id);
 
+  // Aplica a assinatura institucional padrão (sem duplicar).
+  const bodyWithSignature = applySignature(request.body);
+
   try {
     const { messageId, threadId } = await gmail.sendEmail({
       to: recipient,
       subject: request.subject,
-      body: request.body,
+      body: bodyWithSignature,
     });
 
     db.prepare(
@@ -158,7 +162,7 @@ export async function sendRequest(requestId) {
       `INSERT INTO messages
         (request_id, direction, author, subject, body, gmail_message_id, gmail_thread_id, approval_status)
        VALUES (?, 'outbound', ?, ?, ?, ?, ?, 'sent')`,
-    ).run(request.id, request.profile_name, request.subject, request.body, messageId, threadId);
+    ).run(request.id, request.profile_name, request.subject, bodyWithSignature, messageId, threadId);
 
     log('info', 'gmail', `E-mail enviado (${request.public_id}) thread=${threadId}`, {
       requestId: request.id,
@@ -298,19 +302,20 @@ async function sendFollowUpMessage(msg, request) {
   if (settings.test_mode) recipient = settings.authorized_recipient; // safety
   if (!recipient) throw new Error('Nenhum destinatário autorizado configurado.');
 
+  const bodyWithSignature = applySignature(msg.body);
   const sent = await gmail.sendEmail({
     to: recipient,
     subject: msg.subject,
-    body: msg.body,
+    body: bodyWithSignature,
     threadId: request.gmail_thread_id,
     inReplyTo: request.gmail_message_id,
     references: request.gmail_message_id,
   });
 
   db.prepare(
-    `UPDATE messages SET approval_status = 'approved', gmail_message_id = ?,
+    `UPDATE messages SET approval_status = 'approved', body = ?, gmail_message_id = ?,
       gmail_thread_id = ? WHERE id = ?`,
-  ).run(sent.messageId, sent.threadId, msg.id);
+  ).run(bodyWithSignature, sent.messageId, sent.threadId, msg.id);
 
   // One more follow-up sent; conversation is awaiting the next reply.
   db.prepare(

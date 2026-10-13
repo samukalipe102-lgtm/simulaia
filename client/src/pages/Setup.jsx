@@ -118,7 +118,7 @@ export default function Setup() {
 
       {/* 3. Serviços */}
       <Card>
-        <CardHeader title="3. Serviços permitidos" subtitle="Categorias que a IA pode usar (perfis e serviços são gerados automaticamente)" />
+        <CardHeader title="3. Serviços e dados escolares" subtitle="Perfis, serviços e processos são gerados automaticamente; os 61 alunos/responsáveis são importados (idempotente)" />
         <div className="p-5 flex flex-wrap gap-2">
           {CATS.map((c) => {
             const active = form.enabled_categories.includes(c.v);
