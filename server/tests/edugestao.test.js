@@ -91,3 +91,27 @@ test('Assinatura: aplicada ao corpo e sem duplicar quando reaplicada', () => {
   const occurrences = (twice.match(/EduGestão — Gestão e Atendimento Escolar/g) || []).length;
   assert.equal(occurrences, 1);
 });
+
+const gen = await import('../src/ai/generator.js');
+
+test('Modo profissional: solicitação sem marcadores de simulação', () => {
+  const service = { name: 'Declaração de matrícula', category: 'declaracao' };
+  const profile = { name: 'Maria Santos', role: 'responsavel' };
+  // Modo real
+  const real = gen.generateRequestContent({ service, profile, seed: 7, realMode: true });
+  assert.ok(!real.subject.includes('[SIMULAÇÃO]'));
+  assert.doesNotMatch(real.body, /perfil fictício|simulação|fins de teste/i);
+  assert.equal(real.fictitious, false);
+  // Modo simulação (padrão) mantém o marcador
+  const sim = gen.generateRequestContent({ service, profile, seed: 7, realMode: false });
+  assert.ok(sim.subject.includes('[SIMULAÇÃO]'));
+  assert.match(sim.body, /simulação/i);
+  assert.equal(sim.fictitious, true);
+});
+
+test('Modo profissional: acompanhamento sem rodapé de simulação', () => {
+  const request = { public_id: 'SIM-2026-0001', subject: 'Declaração de matrícula', category: 'declaracao', profile_name: 'Maria Santos' };
+  const real = gen.generateFollowUp({ request, lastInbound: { body: 'ok' }, realMode: true });
+  assert.doesNotMatch(real.body, /perfil fictício|Acompanhamento fictício|simulação/i);
+  assert.equal(real.fictitious, false);
+});

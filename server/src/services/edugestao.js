@@ -121,9 +121,9 @@ export function seedSignatures() {
   if (count > 0) return { seeded: 0 };
   const settings = getSettings();
   const email = settings.institution_email || 'adminedugestao@gmail.com';
-  const inst = settings.institution_name || 'EduGestão';
+  // Rodapé institucional fixo conforme a assinatura padrão especificada.
   const mk = (display, sectorLabel) =>
-    `${display}\n${sectorLabel}\nE-mail: ${email}\n${inst} — Gestão e Atendimento Escolar`;
+    `${display}\n${sectorLabel}\nE-mail: ${email}\nEduGestão — Gestão e Atendimento Escolar`;
 
   const rows = [
     ['atendimento', 'Atendimento Escolar', mk('Atendimento Escolar', 'Setor de Atendimento Escolar'), 1],

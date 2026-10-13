@@ -27,13 +27,14 @@ router.put('/', (req, res) => {
     auto_mode,
     auto_followup_approved,
     poll_interval_minutes,
+    real_mode,
   } = req.body || {};
   const current = getSettings();
   const bit = (v, cur) => (v === undefined ? cur : v ? 1 : 0);
   db.prepare(
     `UPDATE settings SET test_mode = ?, authorized_recipient = ?,
       auto_mode = ?, auto_followup_approved = ?, poll_interval_minutes = ?,
-      updated_at = datetime('now') WHERE id = 1`,
+      real_mode = ?, updated_at = datetime('now') WHERE id = 1`,
   ).run(
     bit(test_mode, current.test_mode),
     authorized_recipient === undefined ? current.authorized_recipient : authorized_recipient,
@@ -42,7 +43,19 @@ router.put('/', (req, res) => {
     poll_interval_minutes === undefined
       ? current.poll_interval_minutes
       : Math.max(1, Number(poll_interval_minutes) || 2),
+    bit(real_mode, current.real_mode),
   );
+  res.json(sanitize(getSettings()));
+});
+
+// Alterna o modo real (mensagens profissionais, sem rótulo de simulação).
+// O destinatário continua restrito ao autorizado — não há envio externo.
+router.post('/real-mode', (req, res) => {
+  const { enabled } = req.body || {};
+  db.prepare(
+    `UPDATE settings SET real_mode = ?, updated_at = datetime('now') WHERE id = 1`,
+  ).run(enabled ? 1 : 0);
+  log('info', 'automation', `Modo de mensagens: ${enabled ? 'REAL (profissional)' : 'simulação'}.`);
   res.json(sanitize(getSettings()));
 });
 
