@@ -13,6 +13,10 @@ export ADMIN_PASSWORD=e2epassword1
 export TEST_MODE=true
 export AUTHORIZED_RECIPIENT=authorized@example.com
 export PORT=4100
+# Garante um ambiente determinístico, independente do .env local do desenvolvedor.
+export GOOGLE_CLIENT_ID=
+export GOOGLE_CLIENT_SECRET=
+export OPENAI_API_KEY=
 
 rm -f data/e2e.db data/e2e.db-wal data/e2e.db-shm
 node src/db/seed.js >/dev/null 2>&1

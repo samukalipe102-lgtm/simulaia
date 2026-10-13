@@ -2,12 +2,45 @@
 
 O agendador precisa de um **processo de servidor sempre ativo** para executar as
 automações com o navegador fechado. Portanto, hospede o **backend** em uma
-infraestrutura com processo persistente. O **frontend** é estático e pode ir para
-qualquer CDN/host de estáticos.
+infraestrutura com processo persistente.
+
+> 💡 **Modo recomendado — serviço único.** O backend já serve o frontend buildado
+> (quando `CLIENT_DIST` aponta para `client/dist`). Assim você publica **um único
+> serviço web** — sem CORS, sem proxy separado. É o que o `render.yaml` faz.
 
 ---
 
-## 1. Build do frontend
+## 0. Deploy mais fácil — Render (Blueprint pronto) ⭐
+
+O repositório já inclui um **`render.yaml`** que cria tudo automaticamente.
+
+1. Crie uma conta em **https://dashboard.render.com**.
+2. **New → Blueprint** → conecte o repositório `samukalipe102-lgtm/simulaia`.
+3. O Render lê o `render.yaml` e cria o serviço web (com disco persistente para o
+   SQLite e `JWT_SECRET` gerado automaticamente).
+4. Preencha as **variáveis de ambiente** marcadas como segredo no painel:
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `AUTHORIZED_RECIPIENT`
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+5. Clique em **Apply** e aguarde o primeiro deploy. Anote a URL pública, algo como
+   `https://simula-escola-ia.onrender.com`.
+6. **Ajuste 2 variáveis com a URL pública** (e salve → redeploy automático):
+   - `GOOGLE_REDIRECT_URI = https://SEU-APP.onrender.com/api/gmail/oauth/callback`
+   - `CLIENT_ORIGIN = https://SEU-APP.onrender.com`
+7. No **Google Cloud Console**, adicione essa mesma redirect URI em
+   *URIs de redirecionamento autorizados* do seu OAuth Client.
+8. Acesse a URL pública, faça login e conecte o Gmail. ✅
+
+> O plano `starter` mantém o processo sempre ativo (o plano gratuito do Render
+> hiberna após inatividade, o que pausaria o agendador). Para o agendador rodar
+> 24h de verdade, use um plano com processo persistente.
+
+Outras plataformas equivalentes (todas com o mesmo princípio de serviço único e
+processo always-on): **Railway**, **Fly.io**, **Google Cloud Run** (instância
+mínima ≥ 1). Veja a seção 2 para Docker/VM.
+
+---
+
+## 1. Build do frontend (deploy separado, opcional)
 
 ```bash
 cd client
@@ -28,31 +61,34 @@ domínio do backend (via proxy/reescrita ou variável de ambiente de build).
 
 O backend **deve** rodar continuamente. Opções:
 
-### Opção A — Docker (recomendado)
+### Opção A — Docker Compose (backend + frontend)
 
-```dockerfile
-# server/Dockerfile
-FROM node:22-slim
-WORKDIR /app
-COPY server/package*.json ./
-RUN npm ci --omit=dev
-COPY server/ .
-RUN mkdir -p data
-ENV NODE_ENV=production
-EXPOSE 4000
-CMD ["node", "src/index.js"]
-```
+O repositório já traz `server/Dockerfile`, `client/Dockerfile`,
+`client/nginx.conf` e `docker-compose.yml`. Para subir tudo:
 
 ```bash
-docker build -t simula-escola-ia -f server/Dockerfile .
-docker run -d --restart=always -p 4000:4000 \
-  --env-file server/.env \
-  -v simula_data:/app/data \
-  simula-escola-ia
+bash setup.sh                   # cria o server/.env (gera JWT_SECRET)
+docker compose up -d --build    # backend + frontend; acesse http://localhost:8080
 ```
 
-O volume `simula_data` preserva o banco SQLite entre reinícios. O
-`--restart=always` garante que o processo (e o agendador) retorne após quedas.
+- O volume `simula_data` preserva o banco SQLite entre reinícios.
+- `restart: always` garante que o processo (e o agendador) retorne após quedas.
+- O Nginx do frontend faz proxy de `/api` para o backend.
+
+Para rodar só o backend em modo **serviço único** (ele mesmo serve o frontend):
+
+```bash
+cd client && npm ci && npm run build          # gera client/dist
+cd ../server
+docker build -t simula-escola-ia .
+docker run -d --restart=always -p 4000:4000 \
+  --env-file .env \
+  -e CLIENT_DIST=/app/client-dist \
+  -v simula_data:/app/data \
+  -v "$(pwd)/../client/dist":/app/client-dist:ro \
+  simula-escola-ia
+# acesse http://localhost:4000
+```
 
 ### Opção B — systemd (VM Linux)
 

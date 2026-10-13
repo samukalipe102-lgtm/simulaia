@@ -35,6 +35,13 @@ jobs:
       - name: Testes end-to-end (API real, sem Gmail real)
         run: npm run test:e2e
 
+      - name: Build do frontend (para o teste de serviço único)
+        working-directory: client
+        run: npm ci && npm run build
+
+      - name: Teste de serviço único (backend serve API + frontend)
+        run: npm run test:single
+
   frontend-build:
     name: Frontend — build de produção
     runs-on: ubuntu-latest
