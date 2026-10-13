@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
+  { to: '/setup', label: 'Configuração inicial', icon: '🪄' },
   { to: '/solicitacoes', label: 'Solicitações escolares', icon: '📝' },
   { to: '/conversas', label: 'Conversas e e-mails', icon: '✉️' },
   { to: '/automacoes', label: 'Automações e agendamentos', icon: '⚙️' },

@@ -8,19 +8,36 @@
 import cron from 'node-cron';
 import { getSettings, log } from '../db/index.js';
 import { listActiveAutomations, runAutomationStep, updateNextRun } from '../services/automation.js';
-import { syncReplies } from '../services/requests.js';
+import { syncReplies, processConversations } from '../services/requests.js';
 import { gmailConfigured } from '../config.js';
 
 let tickRunning = false;
 let syncRunning = false;
 let tasks = [];
 
+// In-memory runtime state surfaced to the dashboard (last sync, last tick, etc).
+const runtime = {
+  startedAt: null,
+  lastTickAt: null,
+  lastSyncAt: null,
+  lastConversationRunAt: null,
+  lastError: null,
+};
+
+export function getRuntime() {
+  return { ...runtime };
+}
+
+// Generation/sending tick: honors per-automation interval/caps/hours.
 async function tick() {
   if (tickRunning) return;
   tickRunning = true;
   try {
+    runtime.lastTickAt = new Date().toISOString();
     const settings = getSettings();
     if (settings.emergency_stop) return; // all automations halted
+    // Generation only runs when the master auto_mode is on.
+    if (!settings.auto_mode) return;
 
     const automations = listActiveAutomations();
     for (const automation of automations) {
@@ -30,31 +47,51 @@ async function tick() {
       }
     }
   } catch (err) {
+    runtime.lastError = err.message;
     log('error', 'scheduler', `Erro no tick do agendador: ${err.message}`);
   } finally {
     tickRunning = false;
   }
 }
 
+// Sync tick: import replies from Gmail, then run the conversation engine so
+// classification + next-step decisions happen immediately. Respects the
+// configurable poll interval (settings.poll_interval_minutes).
 async function syncTick() {
   if (syncRunning) return;
-  if (!gmailConfigured(getSettings())) return;
+  const settings = getSettings();
+  if (settings.emergency_stop) return;
+  if (!gmailConfigured(settings)) return;
+
+  // Respect the configured polling interval (the cron fires every minute).
+  const interval = Math.max(1, Number(settings.poll_interval_minutes || 2));
+  if (runtime.lastSyncAt) {
+    const elapsedMin = (Date.now() - new Date(runtime.lastSyncAt).getTime()) / 60000;
+    if (elapsedMin < interval) return;
+  }
+
   syncRunning = true;
   try {
     await syncReplies();
+    runtime.lastSyncAt = new Date().toISOString();
+    // Decide next steps for conversations that just got a reply.
+    await processConversations();
+    runtime.lastConversationRunAt = new Date().toISOString();
   } catch (err) {
-    log('error', 'scheduler', `Erro ao sincronizar respostas: ${err.message}`);
+    runtime.lastError = err.message;
+    log('error', 'scheduler', `Erro ao sincronizar/processar conversas: ${err.message}`);
   } finally {
     syncRunning = false;
   }
 }
 
 export function startScheduler() {
-  // Automation tick: every minute, honoring per-automation interval/caps/hours.
+  runtime.startedAt = new Date().toISOString();
+  // Generation tick: every minute (gated by auto_mode + per-automation rules).
   tasks.push(cron.schedule('* * * * *', tick));
-  // Reply sync: every 2 minutes.
-  tasks.push(cron.schedule('*/2 * * * *', syncTick));
-  log('info', 'scheduler', 'Agendador iniciado (tick 1min, sync 2min).');
+  // Sync + conversation engine: every minute, throttled to poll_interval_minutes.
+  tasks.push(cron.schedule('* * * * *', syncTick));
+  log('info', 'scheduler', 'Agendador iniciado (geração + sincronização/decisão de conversas).');
 }
 
 export function stopScheduler() {

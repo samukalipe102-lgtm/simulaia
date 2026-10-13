@@ -35,6 +35,9 @@ jobs:
       - name: Testes end-to-end (API real, sem Gmail real)
         run: npm run test:e2e
 
+      - name: Testes end-to-end do modo automático
+        run: npm run test:auto
+
       - name: Build do frontend (para o teste de serviço único)
         working-directory: client
         run: npm ci && npm run build

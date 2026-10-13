@@ -159,18 +159,130 @@ export async function generateWithLLM({ service, profile }) {
  */
 export function generateFollowUp({ request, lastInbound }) {
   const quote = (lastInbound?.body || '').slice(0, 220);
+  const classification = arguments[0]?.classification;
+
+  // Tailor the follow-up to the detected intent of the last reply.
+  let ask;
+  switch (classification) {
+    case 'awaiting_info':
+      ask =
+        'poderia, por gentileza, informar quais dados ou documentos ainda são ' +
+        'necessários para dar andamento?';
+      break;
+    case 'needs_followup':
+      ask =
+        'gostaria de confirmar os próximos passos e um prazo estimado para a ' +
+        'conclusão.';
+      break;
+    default:
+      ask = 'gostaria de confirmar os próximos passos.';
+  }
+
   const body =
     `Olá, obrigado(a) pelo retorno.\n\n` +
-    `Em relação à sua resposta ${quote ? `("${quote}...")` : ''}, ` +
-    `gostaria de confirmar os próximos passos para a solicitação ` +
-    `${request.public_id} (${request.category}).\n\n` +
+    `Em relação à sua resposta ${quote ? `("${quote}...")` : ''}, ${ask}\n\n` +
+    `Trata-se da solicitação ${request.public_id} (${request.category}).\n\n` +
     `Permaneço à disposição para qualquer informação adicional.\n\n` +
     `— ${request.profile_name} (perfil fictício / simulação)\n\n` +
-    `---\nAcompanhamento fictício gerado pelo Simula Escola IA. Aguarda ` +
-    `aprovação do administrador antes do envio.`;
+    `---\nAcompanhamento fictício gerado pelo Simula Escola IA (simulação).`;
   return {
     subject: `Re: ${request.subject}`,
     body,
     fictitious: true,
   };
+}
+
+// Possible classifications for an inbound reply.
+export const REPLY_CLASSES = [
+  'resolved', // a solicitação foi atendida/concluída
+  'awaiting_info', // falta alguma informação/documento do solicitante
+  'needs_followup', // precisa de um acompanhamento para prosseguir
+  'closed', // conversa encerrada pela outra parte
+  'needs_admin', // caso ambíguo/sensível → intervenção humana
+];
+
+// Deterministic keyword-based classifier (offline fallback).
+function classifyByKeywords(text) {
+  const t = (text || '').toLowerCase();
+  const has = (...words) => words.some((w) => t.includes(w));
+
+  // Check "closed/denied" BEFORE "resolved" (e.g. "indeferido" must not match
+  // the "deferido" substring used for resolved).
+  if (has('indeferid', 'encerr', 'não daremos', 'nao daremos', 'arquivad', 'cancelad', 'negad')) {
+    return { classification: 'closed', confidence: 0.7, source: 'keywords' };
+  }
+  if (has('resolvido', 'concluíd', 'concluido', 'finalizado', 'emitid', 'pronto',
+          'disponível', 'disponivel', 'deferid', 'atendid', 'segue em anexo', 'anexo o')) {
+    return { classification: 'resolved', confidence: 0.7, source: 'keywords' };
+  }
+  if (has('precisamos de', 'preciso de', 'envie', 'informe', 'qual o', 'poderia informar',
+          'faltou', 'faltando', 'documento', 'cpf', 'rg', 'matrícula', 'matricula',
+          'comprovante', 'dados')) {
+    return { classification: 'awaiting_info', confidence: 0.6, source: 'keywords' };
+  }
+  if (has('aguarde', 'em análise', 'em analise', 'processando', 'prazo', 'retornaremos',
+          'em breve', 'estamos verificando', 'verificando')) {
+    return { classification: 'needs_followup', confidence: 0.55, source: 'keywords' };
+  }
+  // Default: nudge the conversation forward with a follow-up.
+  return { classification: 'needs_followup', confidence: 0.3, source: 'keywords' };
+}
+
+/**
+ * Classify an inbound reply within the conversation context.
+ * Uses the LLM when configured; otherwise a deterministic keyword heuristic.
+ * Always returns { classification, confidence, source, reason? }.
+ */
+export async function classifyReply({ request, replyText, history = [] } = {}) {
+  const fallback = classifyByKeywords(replyText);
+
+  if (!config.openai.apiKey) return fallback;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.openai.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.openai.model,
+        temperature: 0,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Você classifica a ÚLTIMA resposta recebida em uma conversa de ' +
+              'atendimento escolar SIMULADO. Responda em JSON ' +
+              '{"classification","reason"}. classification deve ser um de: ' +
+              REPLY_CLASSES.join(', ') +
+              '. "resolved" = pedido atendido/concluído; "awaiting_info" = falta ' +
+              'informação do solicitante; "needs_followup" = em andamento, vale ' +
+              'um acompanhamento; "closed" = encerrado/indeferido; "needs_admin" ' +
+              '= ambíguo/sensível que exige um humano.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              solicitacao: { assunto: request?.subject, categoria: request?.category },
+              historico: history.slice(-6),
+              ultima_resposta: (replyText || '').slice(0, 1500),
+            }),
+          },
+        ],
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+    if (!REPLY_CLASSES.includes(parsed.classification)) return fallback;
+    return {
+      classification: parsed.classification,
+      confidence: 0.9,
+      source: 'llm',
+      reason: parsed.reason || '',
+    };
+  } catch {
+    return fallback;
+  }
 }

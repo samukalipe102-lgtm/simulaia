@@ -96,8 +96,11 @@ test('Flow: follow-up is drafted pending, then approved + sent in same thread', 
 
   const sent = await requests.approveAndSendFollowUp(draft.id);
   assert.equal(sent.threadId, r.gmail_thread_id); // same thread
-  const req = db.prepare('SELECT status FROM requests WHERE id = ?').get(r.id);
-  assert.equal(req.status, 'completed');
+  // After sending a follow-up, the conversation awaits the NEXT reply and the
+  // follow-up counter increments (it is not "completed" yet).
+  const req = db.prepare('SELECT status, followup_count FROM requests WHERE id = ?').get(r.id);
+  assert.equal(req.status, 'awaiting_reply');
+  assert.equal(req.followup_count, 1);
   const msg = db.prepare('SELECT approval_status FROM messages WHERE id = ?').get(draft.id);
   assert.equal(msg.approval_status, 'approved');
 });
