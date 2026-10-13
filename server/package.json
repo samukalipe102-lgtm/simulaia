@@ -14,6 +14,7 @@
     "test:single": "bash tests/single-service.sh",
     "test:auto": "bash tests/e2e-auto.sh",
     "test:edu": "bash tests/e2e-edugestao.sh",
+    "test:central": "bash tests/e2e-central.sh",
     "verify:env": "bash tests/verify-env.sh"
   },
   "engines": {
