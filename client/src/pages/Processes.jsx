@@ -81,8 +81,12 @@ export default function Processes() {
                   <span className="text-[11px] text-slate-400 shrink-0">{dt(r.updated_at)}</span>
                 </div>
                 <div className="text-sm text-slate-600 truncate">{r.subject}</div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[11px] text-slate-400">{r.public_id}</span>
+                <div className="flex items-center justify-between mt-1 gap-2">
+                  <span className="text-[11px] text-slate-400 truncate">
+                    {r.public_id}
+                    {r.origin_kind === 'forwarded_request' && ' · 📨 encaminhada'}
+                    {r.origin_kind === 'response_copy' && ' · ↩️ cópia de resposta'}
+                  </span>
                   <StatusBadge status={r.status} />
                 </div>
               </button>

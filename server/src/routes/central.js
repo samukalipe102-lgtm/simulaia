@@ -112,6 +112,35 @@ router.get('/attachments/:id/download', async (req, res) => {
   }
 });
 
+// --- Configuração do fluxo Outlook→Gmail (encaminhamento/cópias) ---
+router.get('/forwarding', (req, res) => {
+  const s = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  res.json({
+    official_email: s.official_email,
+    archive_email: s.archive_email,
+    forwarding_enabled: !!s.forwarding_enabled,
+    response_copy_enabled: !!s.response_copy_enabled,
+  });
+});
+router.put('/forwarding', (req, res) => {
+  const b = req.body || {};
+  const s = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  db.prepare(
+    `UPDATE settings SET official_email=?, archive_email=?, forwarding_enabled=?,
+      response_copy_enabled=?, updated_at=datetime('now') WHERE id=1`,
+  ).run(
+    b.official_email ?? s.official_email,
+    b.archive_email ?? s.archive_email,
+    b.forwarding_enabled === undefined ? s.forwarding_enabled : (b.forwarding_enabled ? 1 : 0),
+    b.response_copy_enabled === undefined ? s.response_copy_enabled : (b.response_copy_enabled ? 1 : 0),
+  );
+  const n = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  res.json({
+    official_email: n.official_email, archive_email: n.archive_email,
+    forwarding_enabled: !!n.forwarding_enabled, response_copy_enabled: !!n.response_copy_enabled,
+  });
+});
+
 // --- Automação administrativa ---
 router.get('/admin-automation', (req, res) => {
   res.json({ config: getConfig(), stats: queueStats(), queue: listQueue(100) });

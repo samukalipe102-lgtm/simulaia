@@ -5,6 +5,7 @@
 
 import { db, log, getSettings } from '../db/index.js';
 import * as gmail from './gmail.js';
+import { parseForwarded, stripForwardPrefixes } from './forwardParser.js';
 
 function nextProtocol() {
   const year = new Date().getFullYear();
@@ -40,36 +41,72 @@ export async function syncInbox({ max = 30 } = {}) {
   let imported = 0;
   let processes = 0;
 
+  const officialEmail = (settings.official_email || '').toLowerCase();
+
   for (const msg of inbox) {
     const threadId = msg.gmailThreadId;
     // Localiza (ou cria) o processo pela thread.
     let request = db.prepare('SELECT * FROM requests WHERE gmail_thread_id = ?').get(threadId);
     if (!request) {
       const protocol = nextProtocol();
-      const senderName = parseName(msg.from) || msg.from;
-      const senderEmail = parseEmail(msg.from);
+      const envelopeEmail = parseEmail(msg.from);
+
+      // Fluxo Outlook→Gmail: se o e-mail foi encaminhado (geralmente pelo Outlook
+      // oficial), extrai o remetente ORIGINAL (aluno/responsável).
+      const fwd = parseForwarded({ subject: msg.subject, body: msg.body || '' });
+      const isFromOutlook = officialEmail && envelopeEmail === officialEmail;
+
+      let originKind = 'direct';
+      let senderName = parseName(msg.from) || msg.from;
+      let senderEmail = envelopeEmail;
+      let originalSenderEmail = null;
+      let originalDate = null;
+      let subject = msg.subject;
+      let body = msg.body || msg.snippet || '';
+
+      if (fwd) {
+        // Heurística: se o conteúdo encaminhado é uma resposta (Re:) ou veio do
+        // próprio e-mail oficial, trata como CÓPIA DE RESPOSTA; senão, é a
+        // SOLICITAÇÃO encaminhada do aluno/responsável.
+        const looksResponse = /^\s*(re|resp)\s*:/i.test(msg.subject) ||
+          (officialEmail && fwd.originalFromEmail === officialEmail);
+        originKind = looksResponse ? 'response_copy' : 'forwarded_request';
+        senderName = fwd.originalName || senderName;
+        senderEmail = fwd.originalFromEmail || senderEmail;
+        originalSenderEmail = fwd.originalFromEmail || null;
+        originalDate = fwd.originalDate || null;
+        subject = fwd.originalSubject || stripForwardPrefixes(msg.subject);
+        body = fwd.originalBody || body;
+      } else if (isFromOutlook) {
+        originKind = 'forwarded_request';
+      }
+
       const info = db
         .prepare(
           `INSERT INTO requests
             (public_id, subject, body, category, profile_name, profile_role, recipient,
              status, conversation_state, fictitious, source, sender_email,
+             origin_kind, original_sender_email, original_date,
              gmail_thread_id, gmail_message_id, sent_at)
            VALUES (?, ?, ?, 'esclarecimento', ?, 'responsavel', ?, 'replied', 'open', 0,
-             'inbound', ?, ?, ?, datetime('now'))`,
+             'inbound', ?, ?, ?, ?, ?, ?, datetime('now'))`,
         )
         .run(
           protocol,
-          msg.subject,
-          msg.body || msg.snippet || '',
+          subject,
+          body,
           senderName,
           settings.authorized_recipient || null,
           senderEmail,
+          originKind,
+          originalSenderEmail,
+          originalDate,
           threadId,
           msg.gmailMessageId,
         );
       request = db.prepare('SELECT * FROM requests WHERE id = ?').get(info.lastInsertRowid);
       processes++;
-      log('info', 'inbox', `Novo processo a partir de e-mail: ${protocol} (${senderEmail})`, {
+      log('info', 'inbox', `Novo processo (${originKind}): ${protocol} (${senderEmail})`, {
         requestId: request.id,
       });
     }

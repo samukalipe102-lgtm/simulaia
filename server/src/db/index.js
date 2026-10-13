@@ -37,6 +37,16 @@ export function migrate() {
   ensureColumn('settings', 'institution_email', "TEXT NOT NULL DEFAULT 'adminedugestao@gmail.com'");
   ensureColumn('settings', 'default_sector', "TEXT NOT NULL DEFAULT 'Atendimento Escolar'");
 
+  // Fluxo Outlook (oficial) → Gmail (apoio/arquivo).
+  // official_email: endereço oficial de atendimento (Outlook).
+  ensureColumn('settings', 'official_email', "TEXT NOT NULL DEFAULT 'admsedugestao@outlook.com'");
+  // archive_email: Gmail que recebe encaminhadas + cópias (conta conectada).
+  ensureColumn('settings', 'archive_email', "TEXT NOT NULL DEFAULT 'adminedugestao@gmail.com'");
+  // Flags administráveis do encaminhamento/cópias (apenas exibição/registro de
+  // intenção — o encaminhamento real é feito por regra nativa do Outlook).
+  ensureColumn('settings', 'forwarding_enabled', 'INTEGER NOT NULL DEFAULT 1');
+  ensureColumn('settings', 'response_copy_enabled', 'INTEGER NOT NULL DEFAULT 1');
+
   // Full-automation settings (single setup + autonomous operation).
   ensureColumn('settings', 'setup_completed', 'INTEGER NOT NULL DEFAULT 0');
   // auto_mode: master switch for the end-to-end automatic flow.
@@ -70,6 +80,12 @@ export function migrate() {
   ensureColumn('requests', 'source', "TEXT NOT NULL DEFAULT 'generated'");
   ensureColumn('requests', 'sender_email', 'TEXT');  // e-mail do remetente (inbound)
   ensureColumn('messages', 'has_attachments', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Fluxo Outlook→Gmail: distingue solicitação encaminhada vs cópia de resposta.
+  // origin_kind em requests: 'forwarded_request' | 'response_copy' | 'direct'
+  ensureColumn('requests', 'origin_kind', "TEXT NOT NULL DEFAULT 'direct'");
+  ensureColumn('requests', 'original_sender_email', 'TEXT'); // remetente real (aluno/responsável)
+  ensureColumn('requests', 'original_date', 'TEXT');
 
   // Garante a linha única de configuração da automação administrativa.
   const adminCfg = db.prepare('SELECT id FROM admin_automation WHERE id = 1').get();

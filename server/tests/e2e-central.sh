@@ -40,6 +40,13 @@ check "dedupe evita duplicado" "$(echo "$ENQ2" | jqn '.duplicated')" "true"
 check "stats mostram 1 pendente" "$(curl -s $B/central/admin-automation -H "$AUTH" | jqn '.stats.counts.pending')" "1"
 check "pausar automação" "$(curl -s -X POST $B/central/admin-automation/pause -H "$AUTH" | jqn '.status')" "paused"
 
+echo "Configuração do fluxo Outlook→Gmail"
+check "forwarding config responde" "$(curl -s -o /dev/null -w '%{http_code}' $B/central/forwarding -H "$AUTH")" "200"
+FW=$(curl -s -X PUT $B/central/forwarding -H "$AUTH" -H 'Content-Type: application/json' -d '{"official_email":"admsedugestao@outlook.com","archive_email":"adminedugestao@gmail.com","forwarding_enabled":true,"response_copy_enabled":true}')
+check "e-mail oficial (Outlook) salvo" "$(echo "$FW" | jqn '.official_email')" "admsedugestao@outlook.com"
+check "e-mail de arquivo (Gmail) salvo" "$(echo "$FW" | jqn '.archive_email')" "adminedugestao@gmail.com"
+check "encaminhamento habilitado" "$(echo "$FW" | jqn '.forwarding_enabled')" "true"
+
 echo "Readiness continua disponível"
 check "readiness responde" "$(curl -s -o /dev/null -w '%{http_code}' $B/reports/readiness -H "$AUTH")" "200"
 
