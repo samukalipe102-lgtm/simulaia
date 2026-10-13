@@ -75,7 +75,8 @@ function makeRng(seed) {
  * Build a simulated request from an enabled service + fictitious profile.
  * @returns {{subject, body, category, fictitious:true}}
  */
-export function generateRequestContent({ service, profile, seed } = {}) {
+export function generateRequestContent(opts = {}) {
+  const { service, profile, seed } = opts;
   const rnd = makeRng(seed);
   const category = service?.category || 'esclarecimento';
   const role = profile?.role || 'responsavel';
@@ -88,26 +89,43 @@ export function generateRequestContent({ service, profile, seed } = {}) {
   const serviceName = service?.name || 'um esclarecimento escolar';
   const refNote = profile?.context ? ` ${profile.context}` : '';
 
-  const subject = `[SIMULAÇÃO] ${subjectBase}`;
+  // realMode = true → mensagem profissional (sem marcadores de simulação).
+  // realMode = false → mantém marcador discreto de teste (segurança no setup).
+  const realMode = opts?.realMode ?? false;
+  const senderName = profile?.name || 'Solicitante';
+
+  const subject = realMode ? subjectBase : `[SIMULAÇÃO] ${subjectBase}`;
+  const sign = realMode
+    ? `— ${senderName}`
+    : `— ${senderName} (perfil fictício / simulação)`;
+  const footer = realMode
+    ? '' // sem rodapé de simulação em modo real
+    : `\n\n---\nMensagem gerada automaticamente pelo EduGestão Atendimento para fins de ` +
+      `teste e simulação. Não representa uma pessoa real nem um aluno real.`;
+
   const body =
     `${opener} ${serviceName}.` +
     `${refNote}\n\n` +
     `${closer}\n\n` +
-    `— ${profile?.name || 'Perfil fictício'} (perfil fictício / simulação)\n\n` +
-    `---\n` +
-    `Mensagem gerada automaticamente pelo Simula Escola IA para fins de ` +
-    `teste e simulação. Não representa uma pessoa real nem um aluno real.`;
+    `${sign}${footer}`;
 
-  return { subject, body, category, fictitious: true };
+  return { subject, body, category, fictitious: !realMode };
 }
 
 /**
  * Optional LLM enrichment. Falls back silently to template output on any error
  * or when no API key is configured.
  */
-export async function generateWithLLM({ service, profile }) {
+export async function generateWithLLM({ service, profile, realMode = false } = {}) {
   if (!config.openai.apiKey) return null;
   try {
+    const systemPrompt = realMode
+      ? 'Você redige solicitações de atendimento escolar em português do Brasil, ' +
+        'de forma profissional e cordial. Responda em JSON {"subject","body"}. ' +
+        'Não inclua rótulos de teste nem marcadores de simulação.'
+      : 'Você gera solicitações escolares FICTÍCIAS em português do Brasil ' +
+        'para teste de um sistema. Nunca use pessoas ou alunos reais. ' +
+        'Responda em JSON {"subject","body"}. O assunto deve começar com "[SIMULAÇÃO]".';
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -118,13 +136,7 @@ export async function generateWithLLM({ service, profile }) {
         model: config.openai.model,
         temperature: 0.9,
         messages: [
-          {
-            role: 'system',
-            content:
-              'Você gera solicitações escolares FICTÍCIAS em português do Brasil ' +
-              'para teste de um sistema. Nunca use pessoas ou alunos reais. ' +
-              'Responda em JSON {"subject","body"}. O assunto deve começar com "[SIMULAÇÃO]".',
-          },
+          { role: 'system', content: systemPrompt },
           {
             role: 'user',
             content: JSON.stringify({
@@ -141,11 +153,15 @@ export async function generateWithLLM({ service, profile }) {
     const data = await res.json();
     const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
     if (!parsed.subject || !parsed.body) return null;
+    if (realMode) {
+      const subject = parsed.subject.replace(/^\[SIMULA[ÇC][ÃA]O\]\s*/i, '');
+      return { subject, body: parsed.body, category: service?.category, fictitious: false };
+    }
     const subject = parsed.subject.startsWith('[SIMULAÇÃO]')
       ? parsed.subject
       : `[SIMULAÇÃO] ${parsed.subject}`;
     const body =
-      `${parsed.body}\n\n---\nMensagem fictícia gerada pelo Simula Escola IA ` +
+      `${parsed.body}\n\n---\nMensagem fictícia gerada pelo EduGestão Atendimento ` +
       `para fins de teste. Não representa pessoas ou alunos reais.`;
     return { subject, body, category: service?.category, fictitious: true };
   } catch {
@@ -157,9 +173,8 @@ export async function generateWithLLM({ service, profile }) {
  * Generate a contextual follow-up given the conversation so far.
  * Returns a draft that MUST be approved before sending (handled by caller).
  */
-export function generateFollowUp({ request, lastInbound }) {
+export function generateFollowUp({ request, lastInbound, classification, realMode = false }) {
   const quote = (lastInbound?.body || '').slice(0, 220);
-  const classification = arguments[0]?.classification;
 
   // Tailor the follow-up to the detected intent of the last reply.
   let ask;
@@ -183,12 +198,14 @@ export function generateFollowUp({ request, lastInbound }) {
     `Em relação à sua resposta ${quote ? `("${quote}...")` : ''}, ${ask}\n\n` +
     `Trata-se da solicitação ${request.public_id} (${request.category}).\n\n` +
     `Permaneço à disposição para qualquer informação adicional.\n\n` +
-    `— ${request.profile_name} (perfil fictício / simulação)\n\n` +
-    `---\nAcompanhamento fictício gerado pelo Simula Escola IA (simulação).`;
+    (realMode
+      ? `— ${request.profile_name}`
+      : `— ${request.profile_name} (perfil fictício / simulação)\n\n` +
+        `---\nAcompanhamento fictício gerado pelo EduGestão Atendimento (simulação).`);
   return {
     subject: `Re: ${request.subject}`,
     body,
-    fictitious: true,
+    fictitious: !realMode,
   };
 }
 

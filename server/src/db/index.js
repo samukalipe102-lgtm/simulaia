@@ -33,7 +33,7 @@ export function migrate() {
   ensureColumn('settings', 'google_client_secret', 'TEXT');
 
   // EduGestão institution identity.
-  ensureColumn('settings', 'institution_name', "TEXT NOT NULL DEFAULT 'EduGestão'");
+  ensureColumn('settings', 'institution_name', "TEXT NOT NULL DEFAULT 'EduGestão Atendimento'");
   ensureColumn('settings', 'institution_email', "TEXT NOT NULL DEFAULT 'adminedugestao@gmail.com'");
   ensureColumn('settings', 'default_sector', "TEXT NOT NULL DEFAULT 'Atendimento Escolar'");
 
@@ -44,6 +44,9 @@ export function migrate() {
   // auto_followup_approved: explicit admin authorization to send follow-ups
   // automatically (required before any auto-send of follow-ups).
   ensureColumn('settings', 'auto_followup_approved', 'INTEGER NOT NULL DEFAULT 0');
+  // real_mode: quando ligado, as mensagens são profissionais (sem rótulos de
+  // simulação). O destinatário continua restrito ao autorizado (sua caixa).
+  ensureColumn('settings', 'real_mode', 'INTEGER NOT NULL DEFAULT 0');
   // How often the server polls Gmail for new replies (minutes).
   ensureColumn('settings', 'poll_interval_minutes', 'INTEGER NOT NULL DEFAULT 2');
 

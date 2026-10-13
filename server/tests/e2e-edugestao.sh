@@ -26,7 +26,7 @@ check "processos semeados (>=10)" "$([ "$(curl -s $B/edugestao/processes -H "$AU
 check "assinaturas semeadas (>=4)" "$([ "$(curl -s $B/edugestao/signatures -H "$AUTH" | jqn '.length')" -ge 4 ] && echo sim || echo nao)" "sim"
 
 echo "Identidade institucional EduGestão"
-check "nome institucional" "$(curl -s $B/edugestao/institution -H "$AUTH" | jqn '.institution_name')" "EduGestão"
+check "nome institucional" "$(curl -s $B/edugestao/institution -H "$AUTH" | jqn '.institution_name')" "EduGestão Atendimento"
 check "e-mail institucional" "$(curl -s $B/edugestao/institution -H "$AUTH" | jqn '.institution_email')" "adminedugestao@gmail.com"
 
 echo "Importação dos 61 pares (idempotente)"
@@ -37,6 +37,10 @@ IMP2=$(curl -s -X POST $B/edugestao/students/import -H "$AUTH")
 check "reimportar não duplica (0 novos)" "$(echo "$IMP2" | jqn '.studentsInserted')" "0"
 check "reimportar: 61 inalterados" "$(echo "$IMP2" | jqn '.unchanged')" "61"
 check "ainda 61 alunos após reimport" "$(curl -s $B/edugestao/students -H "$AUTH" | jqn '.students')" "61"
+
+echo "Modo profissional (real_mode)"
+check "ligar modo profissional" "$(curl -s -X POST $B/settings/real-mode -H "$AUTH" -H 'Content-Type: application/json' -d '{"enabled":true}' | jqn '.real_mode')" "1"
+check "desligar modo profissional" "$(curl -s -X POST $B/settings/real-mode -H "$AUTH" -H 'Content-Type: application/json' -d '{"enabled":false}' | jqn '.real_mode')" "0"
 
 echo "Segurança do SSE"
 check "SSE sem token = 401" "$(curl -s -o /dev/null -w '%{http_code}' $B/events)" "401"

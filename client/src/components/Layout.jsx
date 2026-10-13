@@ -49,7 +49,7 @@ export default function Layout({ children }) {
             <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center font-bold text-white">E</div>
             <div>
               <div className="font-bold text-lg leading-tight">EduGestão</div>
-              <div className="text-xs text-brand-200">Atendimento Escolar</div>
+              <div className="text-xs text-brand-200">Atendimento</div>
             </div>
           </div>
         </div>

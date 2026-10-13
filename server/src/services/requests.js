@@ -57,10 +57,12 @@ export async function createSimulatedRequest(opts = {}) {
   const service = services[Math.floor(Math.random() * services.length)];
   const profile = profiles[Math.floor(Math.random() * profiles.length)];
 
-  const llm = await generateWithLLM({ service, profile }).catch(() => null);
-  const content = llm || generateRequestContent({ service, profile });
-
   const settings = getSettings();
+  const realMode = Boolean(settings.real_mode);
+
+  const llm = await generateWithLLM({ service, profile, realMode }).catch(() => null);
+  const content = llm || generateRequestContent({ service, profile, realMode });
+
   const dest = recipient || settings.authorized_recipient || null;
   const publicId = nextPublicId();
 
@@ -69,7 +71,7 @@ export async function createSimulatedRequest(opts = {}) {
       `INSERT INTO requests
         (public_id, subject, body, category, service_id, profile_id,
          profile_name, profile_role, recipient, status, fictitious, automation_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?, ?)`,
     )
     .run(
       publicId,
@@ -81,6 +83,7 @@ export async function createSimulatedRequest(opts = {}) {
       profile.name,
       profile.role,
       dest,
+      realMode ? 0 : 1,
       automationId,
     );
 
@@ -274,7 +277,7 @@ export function draftFollowUp(requestId) {
     )
     .get(requestId);
 
-  const draft = generateFollowUp({ request, lastInbound });
+  const draft = generateFollowUp({ request, lastInbound, realMode: Boolean(getSettings().real_mode) });
 
   const info = db
     .prepare(
@@ -444,7 +447,7 @@ export async function processConversations() {
     }
 
     // Build a follow-up draft aware of the classification.
-    const draft = generateFollowUp({ request, lastInbound, classification });
+    const draft = generateFollowUp({ request, lastInbound, classification, realMode: Boolean(settings.real_mode) });
 
     // Does the owning automation permit autonomous follow-up?
     let automationAllows = true;

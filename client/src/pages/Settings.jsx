@@ -66,6 +66,20 @@ export default function Settings() {
       </Card>
 
       <Card>
+        <CardHeader title="Formato das mensagens" subtitle="Aparência profissional vs. rótulo de simulação" />
+        <div className="p-5 space-y-3">
+          <Toggle checked={!!settings.real_mode} onChange={(v) => setSettings({ ...settings, real_mode: v ? 1 : 0 })}
+            label="Modo profissional (remove “[SIMULAÇÃO]”, rodapé de teste e “perfil fictício”)" />
+          <p className="text-xs text-slate-500">
+            Com o modo profissional ligado, as mensagens saem com aparência de atendimento real
+            (sem marcadores de simulação). <strong>O destinatário continua sendo apenas a sua caixa
+            autorizada</strong> — não há envio para terceiros. Lembre de clicar em “Salvar”.
+          </p>
+          <Button onClick={save} disabled={busy}>Salvar</Button>
+        </div>
+      </Card>
+
+      <Card>
         <CardHeader title="Parada de emergência" subtitle="Interrompe imediatamente todas as automações" />
         <div className="p-5 flex items-center gap-3">
           {settings.emergency_stop ? (

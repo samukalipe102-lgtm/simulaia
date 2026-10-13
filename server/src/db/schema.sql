@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS settings (
   setup_completed      INTEGER NOT NULL DEFAULT 0,  -- single initial setup done
   auto_mode            INTEGER NOT NULL DEFAULT 0,  -- end-to-end automatic flow on
   auto_followup_approved INTEGER NOT NULL DEFAULT 0,-- admin authorized auto-send of follow-ups
+  real_mode              INTEGER NOT NULL DEFAULT 0,-- mensagens profissionais (sem rótulo de simulação)
   poll_interval_minutes  INTEGER NOT NULL DEFAULT 2,-- Gmail reply polling interval
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
