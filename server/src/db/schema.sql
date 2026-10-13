@@ -158,3 +158,56 @@ CREATE TABLE IF NOT EXISTS settings (
   poll_interval_minutes  INTEGER NOT NULL DEFAULT 2,-- Gmail reply polling interval
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ============================================================
+-- EduGestão — plataforma de atendimento escolar
+-- ============================================================
+
+-- Responsáveis (guardians). Dados mínimos; sem inventar e-mail/telefone/endereço.
+CREATE TABLE IF NOT EXISTS guardians (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  email       TEXT,                         -- opcional; nunca inventado
+  phone       TEXT,                         -- opcional
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (name)
+);
+
+-- Alunos (students), vinculados a um responsável.
+CREATE TABLE IF NOT EXISTS students (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  guardian_id INTEGER,
+  enrollment  TEXT,                         -- matrícula (opcional; nunca inventada)
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (name),
+  FOREIGN KEY (guardian_id) REFERENCES guardians(id)
+);
+
+-- Catálogo de processos escolares administrativos.
+CREATE TABLE IF NOT EXISTS processes (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  code            TEXT UNIQUE NOT NULL,     -- ex.: declaracao_matricula
+  name            TEXT NOT NULL,
+  category        TEXT NOT NULL,            -- declaracao | historico | documento | esclarecimento | cadastro | transferencia | encaminhamento
+  description     TEXT,
+  requirements    TEXT,                     -- requisitos (texto)
+  steps           TEXT,                     -- etapas (texto)
+  responsible_sector TEXT,                  -- setor responsável
+  sla_days        INTEGER DEFAULT 5,        -- prazo configurável (dias)
+  response_template TEXT,                   -- modelo de resposta
+  completion_criteria TEXT,                 -- critérios de conclusão
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Assinaturas institucionais configuráveis por setor.
+CREATE TABLE IF NOT EXISTS signatures (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  sector      TEXT UNIQUE NOT NULL,         -- ex.: atendimento | secretaria | coordenacao | direcao
+  display_name TEXT NOT NULL,               -- ex.: Atendimento Escolar
+  body        TEXT NOT NULL,                -- texto da assinatura (multi-linha)
+  is_default  INTEGER NOT NULL DEFAULT 0,
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);

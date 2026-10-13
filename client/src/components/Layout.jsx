@@ -6,14 +6,15 @@ import { api } from '../lib/api.js';
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
   { to: '/setup', label: 'Configuração inicial', icon: '🪄' },
-  { to: '/solicitacoes', label: 'Solicitações escolares', icon: '📝' },
-  { to: '/conversas', label: 'Conversas e e-mails', icon: '✉️' },
-  { to: '/automacoes', label: 'Automações e agendamentos', icon: '⚙️' },
-  { to: '/servicos', label: 'Serviços escolares', icon: '🏫' },
-  { to: '/perfis', label: 'Perfis simulados', icon: '🧑‍🤝‍🧑' },
+  { to: '/conversas', label: 'Caixa de entrada', icon: '✉️' },
+  { to: '/solicitacoes', label: 'Solicitações', icon: '📝' },
+  { to: '/processos', label: 'Processos escolares', icon: '🗂️' },
+  { to: '/alunos', label: 'Alunos e responsáveis', icon: '🎓' },
+  { to: '/assinaturas', label: 'Assinaturas', icon: '✍️' },
+  { to: '/automacoes', label: 'Automações', icon: '⚙️' },
   { to: '/relatorios', label: 'Relatórios', icon: '📈' },
-  { to: '/gmail', label: 'Integração com Gmail', icon: '📧' },
-  { to: '/configuracoes', label: 'Configurações e segurança', icon: '🔐' },
+  { to: '/gmail', label: 'Integração Gmail', icon: '📧' },
+  { to: '/configuracoes', label: 'Configurações', icon: '🔐' },
 ];
 
 export default function Layout({ children }) {
@@ -44,8 +45,13 @@ export default function Layout({ children }) {
         }`}
       >
         <div className="px-5 py-5 border-b border-white/10">
-          <div className="font-bold text-lg">Simula Escola IA</div>
-          <div className="text-xs text-brand-200 mt-0.5">Painel administrativo</div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center font-bold text-white">E</div>
+            <div>
+              <div className="font-bold text-lg leading-tight">EduGestão</div>
+              <div className="text-xs text-brand-200">Atendimento Escolar</div>
+            </div>
+          </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {NAV.map((item) => (

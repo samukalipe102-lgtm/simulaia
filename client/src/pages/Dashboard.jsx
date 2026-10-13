@@ -4,6 +4,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { api } from '../lib/api.js';
+import { useEvents } from '../hooks/useEvents.js';
 import { Card, CardHeader, StatusBadge, Button, Toggle, Spinner, FictitiousBanner } from '../components/ui.jsx';
 
 const STATUS_ORDER = [
@@ -35,19 +36,25 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [live, setLive] = useState(false);
 
   async function load() {
     try {
       setData(await api.get('/reports/dashboard'));
+      setUpdatedAt(new Date());
     } catch (e) {
       setError(e.message);
     }
   }
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000); // atualização automática (sem recarregar)
+    const t = setInterval(load, 8000); // fallback de polling
     return () => clearInterval(t);
   }, []);
+
+  // Tempo real via SSE: ao receber um evento do servidor, recarrega os dados.
+  useEvents(() => { setLive(true); load(); });
 
   async function toggleAuto(enabled) {
     setBusy(true);
@@ -75,7 +82,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Dashboard — Central de monitoramento</h1>
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Dashboard — Central de monitoramento</h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {live ? '🟢 Tempo real (SSE)' : '🔄 Atualização automática'} ·
+            {' '}atualizado em {updatedAt ? updatedAt.toLocaleTimeString('pt-BR') : '—'}
+          </p>
+        </div>
         <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${st.cls}`}>
           <span className={`w-2.5 h-2.5 rounded-full ${st.dot} animate-pulse`} />
           {st.label}

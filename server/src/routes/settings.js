@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db, getSettings, log } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
+import { importStudents, seedProcesses, seedSignatures } from '../services/edugestao.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -169,8 +170,24 @@ router.post('/setup', (req, res) => {
     );
   }
 
+  // 5) EduGestão: importa os alunos/responsáveis (idempotente) e semeia catálogo
+  //    + assinaturas, se ainda não existirem. Opção import_students (default true).
+  let eduSummary = null;
+  if (b.import_students !== false) {
+    eduSummary = importStudents();
+  }
+  seedProcesses();
+  seedSignatures();
+  if (b.institution_name || b.institution_email || b.default_sector) {
+    db.prepare(
+      `UPDATE settings SET institution_name = COALESCE(?, institution_name),
+        institution_email = COALESCE(?, institution_email),
+        default_sector = COALESCE(?, default_sector), updated_at = datetime('now') WHERE id = 1`,
+    ).run(b.institution_name || null, b.institution_email || null, b.default_sector || null);
+  }
+
   log('info', 'automation', 'Configuração inicial concluída (wizard).');
-  res.json(sanitize(getSettings()));
+  res.json({ ...sanitize(getSettings()), eduSummary });
 });
 
 // Save Google OAuth credentials from the UI (desktop mode). Stored only in the
