@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+
+# SQLite database + WAL files (persistent data; keep out of git)
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm
+
+.DS_Store

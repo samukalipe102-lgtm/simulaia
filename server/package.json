@@ -1,0 +1,27 @@
+{
+  "name": "simula-escola-ia-server",
+  "version": "1.0.0",
+  "description": "Backend for Simula Escola IA — fictitious school request simulator with Gmail integration and server-side scheduler.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node src/db/seed.js",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "bash tests/e2e-live.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "googleapis": "^144.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3"
+  }
+}
