@@ -41,7 +41,16 @@ simula-escola-ia/
 
 ---
 
-## Começando (desenvolvimento)
+## Começando — jeito fácil
+
+```bash
+bash setup.sh                   # cria o server/.env e gera o JWT_SECRET sozinho
+docker compose up -d --build    # sobe backend + frontend; acesse http://localhost:8080
+```
+
+Passo a passo com cliques (incluindo o Google Cloud) em **[`GUIA_RAPIDO.md`](./GUIA_RAPIDO.md)**.
+
+## Começando (desenvolvimento manual)
 
 ### 1. Backend
 
