@@ -164,3 +164,27 @@ test('Modo real: e-mail enviado NÃO contém marcadores de simulação', async (
   assert.doesNotMatch(msg.body, /perfil fict[íi]cio|fins de teste|simula[çc][ãa]o|n[ãa]o representa/i);
   db.prepare('UPDATE settings SET real_mode = 0 WHERE id = 1').run();
 });
+
+test('Envio automático ponta a ponta: tick gera e envia ao destinatário autorizado', async () => {
+  // Simula tudo pronto: auto_mode on, automação ativa, destinatário definido,
+  // Gmail "conectado" (transporte mockado já injetado no topo do arquivo).
+  db.prepare(`UPDATE settings SET auto_mode=1, test_mode=1, authorized_recipient='authorized@example.com', emergency_stop=0 WHERE id=1`).run();
+  // garante uma automação ativa, sem travas de janela/intervalo
+  db.prepare(
+    `INSERT INTO automations (name, status, max_per_day, interval_minutes, allowed_days, start_hour, end_hour, auto_followup)
+     VALUES ('E2E Tick','active',10,0,'0,1,2,3,4,5,6',0,24,0)`,
+  ).run();
+  const autoId = db.prepare("SELECT id FROM automations WHERE name='E2E Tick'").get().id;
+
+  const before = db.prepare("SELECT COUNT(*) AS c FROM requests WHERE status='awaiting_reply'").get().c;
+  const { runAutomationStep } = await import('../src/services/automation.js');
+  const result = await runAutomationStep(autoId);
+  assert.equal(result.sent, true);
+  const after = db.prepare("SELECT COUNT(*) AS c FROM requests WHERE status='awaiting_reply'").get().c;
+  assert.equal(after, before + 1);
+  // o e-mail foi para o destinatário autorizado e tem IDs reais do (mock) Gmail
+  const sent = db.prepare('SELECT * FROM requests WHERE id = ?').get(result.requestId);
+  assert.equal(sent.recipient, 'authorized@example.com');
+  assert.ok(sent.gmail_message_id);
+  assert.ok(sent.gmail_thread_id);
+});

@@ -46,6 +46,22 @@ echo "Seeds automáticos (perfis e serviços) sem cadastro manual"
 check "serviços criados automaticamente" "$([ "$(curl -s $B/services -H "$AUTH" | jqn '.length')" -ge 1 ] && echo sim || echo nao)" "sim"
 check "perfis fictícios criados automaticamente" "$([ "$(curl -s $B/profiles -H "$AUTH" | jqn '.length')" -ge 1 ] && echo sim || echo nao)" "sim"
 check "automação principal criada" "$([ "$(curl -s $B/automations -H "$AUTH" | jqn '.length')" -ge 1 ] && echo sim || echo nao)" "sim"
+# CORREÇÃO DO BUG: com auto_mode no setup, a automação já fica ATIVA (não pausada).
+check "automação fica ATIVA após setup (correção)" "$(curl -s $B/automations -H "$AUTH" | jqn '[0].status')" "active"
+
+echo "Prontidão de envio (readiness)"
+# Sem Gmail conectado, readiness NÃO está pronto e aponta o bloqueio do Gmail.
+check "readiness.ready = false sem Gmail" "$(curl -s $B/reports/readiness -H "$AUTH" | jqn '.ready')" "false"
+check "bloqueio aponta gmail_connected" "$(curl -s $B/reports/readiness -H "$AUTH" | jqn '.blockers.map(b=>b.key).includes("gmail_connected")')" "true"
+check "destinatário já OK no readiness" "$(curl -s $B/reports/readiness -H "$AUTH" | jqn '.checks.find(c=>c.key==="recipient").ok')" "true"
+check "auto_mode já OK no readiness" "$(curl -s $B/reports/readiness -H "$AUTH" | jqn '.checks.find(c=>c.key==="auto_mode").ok')" "true"
+check "automação ativa OK no readiness" "$(curl -s $B/reports/readiness -H "$AUTH" | jqn '.checks.find(c=>c.key==="automation_active").ok')" "true"
+
+echo "Religar auto-mode reativa automações pausadas"
+curl -s -X POST $B/settings/auto-mode -H "$AUTH" -H 'Content-Type: application/json' -d '{"enabled":false}' >/dev/null
+curl -s -X POST $B/automations/1/pause -H "$AUTH" >/dev/null 2>&1
+curl -s -X POST $B/settings/auto-mode -H "$AUTH" -H 'Content-Type: application/json' -d '{"enabled":true}' >/dev/null
+check "auto-mode religado reativa automação" "$(curl -s $B/automations -H "$AUTH" | jqn '[0].status')" "active"
 
 echo "Dashboard após setup (sem Gmail conectado)"
 check "automationState = aguardando_gmail" "$(curl -s $B/reports/dashboard -H "$AUTH" | jqn '.automationState')" "aguardando_gmail"

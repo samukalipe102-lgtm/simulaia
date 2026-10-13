@@ -59,13 +59,35 @@ router.post('/real-mode', (req, res) => {
   res.json(sanitize(getSettings()));
 });
 
-// Toggle the master auto mode on/off.
+// Toggle the master auto mode on/off. Ao LIGAR, também ativa as automações
+// pausadas (com janela de duração), para o agendador operar de fato.
 router.post('/auto-mode', (req, res) => {
   const { enabled } = req.body || {};
   db.prepare(
     `UPDATE settings SET auto_mode = ?, updated_at = datetime('now') WHERE id = 1`,
   ).run(enabled ? 1 : 0);
-  log('info', 'automation', `Modo automático ${enabled ? 'ATIVADO' : 'desativado'}.`);
+
+  if (enabled) {
+    const now = new Date();
+    const paused = db.prepare("SELECT * FROM automations WHERE status = 'paused'").all();
+    for (const a of paused) {
+      const starts = a.starts_at || now.toISOString();
+      const ends = a.ends_at || new Date(now.getTime() + (a.duration_days || 30) * 86400000).toISOString();
+      db.prepare(
+        `UPDATE automations SET status='active', starts_at=?, ends_at=?, updated_at=datetime('now') WHERE id=?`,
+      ).run(starts, ends, a.id);
+    }
+    // Se não houver nenhuma automação, cria uma padrão ativa.
+    const count = db.prepare('SELECT COUNT(*) AS c FROM automations').get().c;
+    if (count === 0) {
+      const ends = new Date(now.getTime() + 30 * 86400000).toISOString();
+      db.prepare(
+        `INSERT INTO automations (name, status, starts_at, ends_at) VALUES ('Automação principal','active',?,?)`,
+      ).run(now.toISOString(), ends);
+    }
+  }
+
+  log('info', 'automation', `Modo automático ${enabled ? 'ATIVADO (automações ativadas)' : 'desativado'}.`);
   res.json(sanitize(getSettings()));
 });
 
@@ -158,29 +180,41 @@ router.post('/setup', (req, res) => {
     auto_followup: bit(b.auto_followup, current.auto_followup_approved),
     max_followups_per_conversation: Number(b.max_followups_per_conversation) || 3,
   };
+  // Se o usuário ligou o modo automático no wizard, já deixa a automação ATIVA
+  // (com janela de duração), para que o agendador comece a operar de fato.
+  const wantAuto = b.auto_mode === undefined ? Boolean(current.auto_mode) : Boolean(b.auto_mode);
+  const now = new Date();
+  const startsAt = now.toISOString();
+  const endsAt = new Date(now.getTime() + rules.duration_days * 86400000).toISOString();
+  const status = wantAuto ? 'active' : 'paused';
+
+  let automationId;
   if (existing) {
     db.prepare(
-      `UPDATE automations SET max_per_day=?, interval_minutes=?, allowed_days=?,
+      `UPDATE automations SET status=?, max_per_day=?, interval_minutes=?, allowed_days=?,
         start_hour=?, end_hour=?, duration_days=?, max_attempts=?, auto_followup=?,
         max_followups_per_conversation=?, categories='', profile_ids='',
-        require_approval=?, updated_at=datetime('now') WHERE id=?`,
+        require_approval=?, starts_at=?, ends_at=?, updated_at=datetime('now') WHERE id=?`,
     ).run(
-      rules.max_per_day, rules.interval_minutes, rules.allowed_days, rules.start_hour,
+      status, rules.max_per_day, rules.interval_minutes, rules.allowed_days, rules.start_hour,
       rules.end_hour, rules.duration_days, rules.max_attempts, rules.auto_followup,
-      rules.max_followups_per_conversation, rules.auto_followup ? 0 : 1, existing.id,
+      rules.max_followups_per_conversation, rules.auto_followup ? 0 : 1,
+      startsAt, endsAt, existing.id,
     );
+    automationId = existing.id;
   } else {
-    db.prepare(
+    const info = db.prepare(
       `INSERT INTO automations
         (name, status, max_per_day, interval_minutes, allowed_days, start_hour, end_hour,
          categories, profile_ids, duration_days, require_approval, max_attempts,
-         auto_followup, max_followups_per_conversation)
-       VALUES ('Automação principal', 'paused', ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?)`,
+         auto_followup, max_followups_per_conversation, starts_at, ends_at)
+       VALUES ('Automação principal', ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      rules.max_per_day, rules.interval_minutes, rules.allowed_days, rules.start_hour,
+      status, rules.max_per_day, rules.interval_minutes, rules.allowed_days, rules.start_hour,
       rules.end_hour, rules.duration_days, rules.auto_followup ? 0 : 1, rules.max_attempts,
-      rules.auto_followup, rules.max_followups_per_conversation,
+      rules.auto_followup, rules.max_followups_per_conversation, startsAt, endsAt,
     );
+    automationId = info.lastInsertRowid;
   }
 
   // 5) EduGestão: importa os alunos/responsáveis (idempotente) e semeia catálogo
