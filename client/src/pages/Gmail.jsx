@@ -1,18 +1,40 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { Card, CardHeader, Button, Spinner } from '../components/ui.jsx';
+import { Card, CardHeader, Button, Input, Spinner } from '../components/ui.jsx';
 
 export default function Gmail() {
   const [status, setStatus] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [creds, setCreds] = useState({ google_client_id: '', google_client_secret: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
-  async function load() { setStatus(await api.get('/gmail/status')); }
+  async function load() {
+    const [st, cfg] = await Promise.all([api.get('/gmail/status'), api.get('/settings')]);
+    setStatus(st);
+    setSettings(cfg);
+    setCreds((c) => ({ ...c, google_client_id: cfg.google_client_id || '' }));
+  }
   useEffect(() => {
     load();
-    const t = setInterval(load, 10000);
+    const t = setInterval(() => api.get('/gmail/status').then(setStatus), 10000);
     return () => clearInterval(t);
   }, []);
+
+  async function saveCreds() {
+    setBusy(true); setMsg('');
+    try {
+      await api.put('/settings/google', {
+        google_client_id: creds.google_client_id,
+        // envia o secret só se o usuário digitou algo novo
+        ...(creds.google_client_secret ? { google_client_secret: creds.google_client_secret } : {}),
+      });
+      setCreds((c) => ({ ...c, google_client_secret: '' }));
+      setMsg('✅ Credenciais do Google salvas.');
+      await load();
+    } catch (e) { setMsg(`❌ ${e.message}`); }
+    finally { setBusy(false); }
+  }
 
   async function connect() {
     setBusy(true); setMsg('');
@@ -39,16 +61,43 @@ export default function Gmail() {
     await load();
   }
 
-  if (!status) return <Spinner />;
+  if (!status || !settings) return <Spinner />;
 
   return (
     <div className="space-y-5">
       <h1 className="text-xl font-bold text-slate-800">Integração com Gmail</h1>
 
+      {/* Configuração das credenciais Google direto na interface (modo desktop) */}
+      <Card>
+        <CardHeader
+          title="Credenciais do Google (OAuth)"
+          subtitle="Cole aqui o Client ID e o Client Secret do seu projeto no Google Cloud"
+        />
+        <div className="p-5 space-y-3">
+          <Input
+            label="Client ID"
+            value={creds.google_client_id}
+            onChange={(e) => setCreds({ ...creds, google_client_id: e.target.value })}
+            placeholder="123...apps.googleusercontent.com"
+          />
+          <Input
+            label={settings.google_client_secret_set ? 'Client Secret (já salvo — digite para substituir)' : 'Client Secret'}
+            type="password"
+            value={creds.google_client_secret}
+            onChange={(e) => setCreds({ ...creds, google_client_secret: e.target.value })}
+            placeholder={settings.google_client_secret_set ? '•••••••• (mantém o atual se vazio)' : 'GOCSPX-...'}
+          />
+          <Button onClick={saveCreds} disabled={busy}>Salvar credenciais</Button>
+          <p className="text-xs text-slate-500">
+            O Client Secret é guardado apenas no banco local e nunca é enviado de volta ao navegador.
+          </p>
+        </div>
+      </Card>
+
       <Card>
         <CardHeader title="Status da conexão" />
         <div className="p-5 space-y-3 text-sm">
-          <Row label="Credenciais configuradas">{status.configured ? '✅ Sim' : '⚠️ Não — defina GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no backend'}</Row>
+          <Row label="Credenciais configuradas">{status.configured ? '✅ Sim' : '⚠️ Não — informe o Client ID e o Secret acima'}</Row>
           <Row label="Conta conectada">{status.connected ? `✅ ${status.email}` : '❌ Não conectada'}</Row>
           {status.lastError && <Row label="Último erro"><span className="text-red-600">{status.lastError}</span></Row>}
         </div>

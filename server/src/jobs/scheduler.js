@@ -38,7 +38,7 @@ async function tick() {
 
 async function syncTick() {
   if (syncRunning) return;
-  if (!gmailConfigured()) return;
+  if (!gmailConfigured(getSettings())) return;
   syncRunning = true;
   try {
     await syncReplies();

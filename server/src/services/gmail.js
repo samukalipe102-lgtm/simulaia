@@ -3,21 +3,18 @@
 // never exposed to the frontend.
 
 import { google } from 'googleapis';
-import { config, gmailConfigured } from '../config.js';
-import { db, log } from '../db/index.js';
+import { config, gmailConfigured, resolveGoogleCreds } from '../config.js';
+import { db, log, getSettings } from '../db/index.js';
 
 function oauthClient() {
-  return new google.auth.OAuth2(
-    config.google.clientId,
-    config.google.clientSecret,
-    config.google.redirectUri,
-  );
+  const creds = resolveGoogleCreds(getSettings());
+  return new google.auth.OAuth2(creds.clientId, creds.clientSecret, creds.redirectUri);
 }
 
 export function getAuthUrl() {
-  if (!gmailConfigured()) {
+  if (!gmailConfigured(getSettings())) {
     throw new Error(
-      'Gmail não configurado. Defina GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.',
+      'Gmail não configurado. Informe o Client ID e o Client Secret do Google (em Configurações) ou no .env.',
     );
   }
   const client = oauthClient();
@@ -146,12 +143,13 @@ function markError(message) {
 }
 
 export function getStatus() {
+  const settings = getSettings();
   const row = getAccountRow();
   if (!row) {
-    return { configured: gmailConfigured(), connected: false, email: null, lastError: null };
+    return { configured: gmailConfigured(settings), connected: false, email: null, lastError: null };
   }
   return {
-    configured: gmailConfigured(),
+    configured: gmailConfigured(settings),
     connected: Boolean(row.connected),
     email: row.email,
     lastError: row.last_error,

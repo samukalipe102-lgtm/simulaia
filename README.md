@@ -41,6 +41,17 @@ simula-escola-ia/
 
 ---
 
+## Formas de usar
+
+| Formato | Para quê | Guia |
+|---------|----------|------|
+| 🖥️ **App de desktop (Windows .exe)** | Rodar no PC com duplo-clique, sem terminal | [`DESKTOP.md`](./DESKTOP.md) |
+| ☁️ **Nuvem (Render / Docker)** | Rodar 24h com o PC desligado (agendador sempre ativo) | [`DEPLOYMENT.md`](./DEPLOYMENT.md) |
+| 💻 **Local (dev)** | Desenvolvimento | abaixo |
+
+> O agendador só envia e-mails enquanto houver um processo rodando: no app de
+> desktop, enquanto ele estiver aberto; na nuvem, o tempo todo.
+
 ## Começando — jeito fácil
 
 ```bash
