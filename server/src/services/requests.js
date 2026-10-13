@@ -6,6 +6,7 @@ import {
   generateRequestContent,
   generateWithLLM,
   generateFollowUp,
+  classifyReply,
 } from '../ai/generator.js';
 import * as gmail from './gmail.js';
 
@@ -199,26 +200,48 @@ export async function syncReplies() {
           .get(m.gmailMessageId);
         if (exists) continue;
 
+        const replyText = m.body || m.snippet || '';
+
+        // Classify the reply in context (LLM if configured, else heuristic).
+        let classification = null;
+        try {
+          const history = db
+            .prepare(
+              `SELECT direction, body FROM messages WHERE request_id = ? ORDER BY id ASC`,
+            )
+            .all(request.id)
+            .map((r) => ({ direction: r.direction, body: (r.body || '').slice(0, 400) }));
+          const result = await classifyReply({ request, replyText, history });
+          classification = result.classification;
+        } catch {
+          classification = null;
+        }
+
         db.prepare(
           `INSERT INTO messages
-            (request_id, direction, author, subject, body, gmail_message_id, gmail_thread_id)
-           VALUES (?, 'inbound', ?, ?, ?, ?, ?)`,
+            (request_id, direction, author, subject, body, gmail_message_id, gmail_thread_id, classification)
+           VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?)`,
         ).run(
           request.id,
           m.from,
           m.subject,
-          m.body || m.snippet,
+          replyText,
           m.gmailMessageId,
           m.gmailThreadId,
+          classification,
         );
         imported++;
 
-        if (request.status === 'awaiting_reply') {
-          db.prepare(
-            `UPDATE requests SET status = 'replied', updated_at = datetime('now') WHERE id = ?`,
-          ).run(request.id);
-        }
-        log('info', 'gmail', `Resposta recebida (${request.public_id})`, {
+        // Mark as replied and record the latest classification. The conversation
+        // engine (processConversations) decides the next step.
+        db.prepare(
+          `UPDATE requests SET
+            status = CASE WHEN status = 'awaiting_reply' THEN 'replied' ELSE status END,
+            last_classification = ?, updated_at = datetime('now')
+           WHERE id = ?`,
+        ).run(classification, request.id);
+
+        log('info', 'gmail', `Resposta recebida (${request.public_id}) → ${classification || 'sem classificação'}`, {
           requestId: request.id,
         });
       }
@@ -267,18 +290,12 @@ export function draftFollowUp(requestId) {
   return db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
 }
 
-/** Approve a pending follow-up and send it in the correct Gmail thread. */
-export async function approveAndSendFollowUp(messageId) {
-  const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
-  if (!msg) throw new Error('Mensagem não encontrada.');
-  if (msg.approval_status !== 'pending') {
-    throw new Error('Mensagem não está pendente de aprovação.');
-  }
-  const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(msg.request_id);
-
+// Internal: actually send a pending follow-up message in the correct thread.
+// Shared by manual approval and the autonomous engine.
+async function sendFollowUpMessage(msg, request) {
   const settings = getSettings();
   let recipient = request.recipient || settings.authorized_recipient;
-  if (settings.test_mode) recipient = settings.authorized_recipient;
+  if (settings.test_mode) recipient = settings.authorized_recipient; // safety
   if (!recipient) throw new Error('Nenhum destinatário autorizado configurado.');
 
   const sent = await gmail.sendEmail({
@@ -293,12 +310,26 @@ export async function approveAndSendFollowUp(messageId) {
   db.prepare(
     `UPDATE messages SET approval_status = 'approved', gmail_message_id = ?,
       gmail_thread_id = ? WHERE id = ?`,
-  ).run(sent.messageId, sent.threadId, messageId);
+  ).run(sent.messageId, sent.threadId, msg.id);
 
+  // One more follow-up sent; conversation is awaiting the next reply.
   db.prepare(
-    `UPDATE requests SET status = 'completed', updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE requests SET status = 'awaiting_reply', conversation_state = 'open',
+      followup_count = followup_count + 1, updated_at = datetime('now') WHERE id = ?`,
   ).run(request.id);
 
+  return sent;
+}
+
+/** Approve a pending follow-up and send it in the correct Gmail thread. */
+export async function approveAndSendFollowUp(messageId) {
+  const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
+  if (!msg) throw new Error('Mensagem não encontrada.');
+  if (msg.approval_status !== 'pending') {
+    throw new Error('Mensagem não está pendente de aprovação.');
+  }
+  const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(msg.request_id);
+  const sent = await sendFollowUpMessage(msg, request);
   log('info', 'gmail', `Acompanhamento aprovado e enviado (${request.public_id})`, {
     requestId: request.id,
   });
@@ -313,4 +344,160 @@ export function rejectFollowUp(messageId) {
     `UPDATE requests SET status = 'replied', updated_at = datetime('now') WHERE id = ?`,
   ).run(msg.request_id);
   return { ok: true };
+}
+
+// Map an AI reply classification to a conversation state.
+function stateForClassification(c) {
+  switch (c) {
+    case 'resolved': return 'resolved';
+    case 'closed': return 'closed';
+    case 'awaiting_info': return 'awaiting_info';
+    case 'needs_admin': return 'needs_admin';
+    case 'needs_followup':
+    default: return 'needs_followup';
+  }
+}
+
+/**
+ * Autonomous conversation engine. For every request that received a reply
+ * ('replied'), decide the next step based on the AI classification and the
+ * configured rules. Runs on the server scheduler — no UI interaction required.
+ *
+ * Behavior:
+ *  - resolved / closed  → mark the conversation finished (status 'completed').
+ *  - needs_admin        → leave for manual review ('awaiting_approval').
+ *  - awaiting_info / needs_followup:
+ *      · if auto-follow-up is approved AND within the per-conversation cap AND
+ *        the automation allows it → generate and SEND the follow-up automatically.
+ *      · otherwise → generate a DRAFT and leave it 'awaiting_approval'.
+ *  - follow-up cap reached → close the conversation ('completed').
+ *
+ * Respects emergency stop. Never sends outside the authorized recipient.
+ */
+export async function processConversations() {
+  const settings = getSettings();
+  if (settings.emergency_stop) return { processed: 0, reason: 'emergency_stop' };
+
+  const replied = db
+    .prepare(`SELECT * FROM requests WHERE status = 'replied'`)
+    .all();
+
+  let processed = 0;
+  let autoSent = 0;
+  let drafted = 0;
+  let closed = 0;
+
+  for (const request of replied) {
+    const lastInbound = db
+      .prepare(
+        `SELECT * FROM messages WHERE request_id = ? AND direction = 'inbound'
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(request.id);
+    if (!lastInbound) continue;
+
+    const classification = lastInbound.classification || request.last_classification || 'needs_followup';
+    const state = stateForClassification(classification);
+    processed++;
+
+    // Terminal classifications: finish the conversation, no new message.
+    if (classification === 'resolved' || classification === 'closed') {
+      db.prepare(
+        `UPDATE requests SET status = 'completed', conversation_state = ?,
+          updated_at = datetime('now') WHERE id = ?`,
+      ).run(state, request.id);
+      log('info', 'ai', `Conversa encerrada automaticamente (${request.public_id}): ${classification}`, {
+        requestId: request.id,
+      });
+      closed++;
+      continue;
+    }
+
+    // Ambiguous/sensitive → human intervention.
+    if (classification === 'needs_admin') {
+      db.prepare(
+        `UPDATE requests SET conversation_state = 'needs_admin', updated_at = datetime('now')
+         WHERE id = ?`,
+      ).run(request.id);
+      log('warn', 'ai', `Conversa requer intervenção administrativa (${request.public_id})`, {
+        requestId: request.id,
+      });
+      continue;
+    }
+
+    // Follow-up cap reached → close.
+    if (request.followup_count >= request.max_followups) {
+      db.prepare(
+        `UPDATE requests SET status = 'completed', conversation_state = 'closed',
+          updated_at = datetime('now') WHERE id = ?`,
+      ).run(request.id);
+      log('info', 'ai', `Limite de acompanhamentos atingido, conversa encerrada (${request.public_id})`, {
+        requestId: request.id,
+      });
+      closed++;
+      continue;
+    }
+
+    // Build a follow-up draft aware of the classification.
+    const draft = generateFollowUp({ request, lastInbound, classification });
+
+    // Does the owning automation permit autonomous follow-up?
+    let automationAllows = true;
+    if (request.automation_id) {
+      const auto = db.prepare('SELECT * FROM automations WHERE id = ?').get(request.automation_id);
+      if (auto) {
+        automationAllows = Boolean(auto.auto_followup);
+        if (request.followup_count >= auto.max_followups_per_conversation) {
+          automationAllows = false;
+        }
+      }
+    }
+
+    const canAutoSend =
+      Boolean(settings.auto_mode) &&
+      Boolean(settings.auto_followup_approved) &&
+      automationAllows;
+
+    const info = db
+      .prepare(
+        `INSERT INTO messages
+          (request_id, direction, author, subject, body, approval_status, is_followup)
+         VALUES (?, 'outbound', ?, ?, ?, 'pending', 1)`,
+      )
+      .run(request.id, request.profile_name, draft.subject, draft.body);
+    const draftMsg = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
+
+    if (canAutoSend) {
+      try {
+        await sendFollowUpMessage(draftMsg, request);
+        db.prepare(
+          `UPDATE requests SET conversation_state = ? WHERE id = ?`,
+        ).run(state, request.id);
+        log('info', 'automation', `Acompanhamento enviado automaticamente (${request.public_id})`, {
+          requestId: request.id,
+        });
+        autoSent++;
+      } catch (err) {
+        db.prepare(
+          `UPDATE requests SET status = 'error', last_error = ?, updated_at = datetime('now')
+           WHERE id = ?`,
+        ).run(err.message, request.id);
+        log('error', 'automation', `Falha ao enviar acompanhamento automático (${request.public_id}): ${err.message}`, {
+          requestId: request.id,
+        });
+      }
+    } else {
+      // Needs manual approval (auto-send not authorized or not allowed).
+      db.prepare(
+        `UPDATE requests SET status = 'awaiting_approval', conversation_state = ?,
+          updated_at = datetime('now') WHERE id = ?`,
+      ).run(state, request.id);
+      log('info', 'ai', `Acompanhamento gerado aguardando aprovação (${request.public_id})`, {
+        requestId: request.id,
+      });
+      drafted++;
+    }
+  }
+
+  return { processed, autoSent, drafted, closed };
 }

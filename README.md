@@ -41,6 +41,13 @@ simula-escola-ia/
 
 ---
 
+## 🤖 Modo totalmente automático
+
+Após uma **configuração inicial única** e a conexão do Gmail, o sistema gera,
+envia, acompanha e encerra solicitações simuladas **automaticamente** no
+servidor. Sua única tarefa diária é **responder pelo Gmail**. Veja o guia
+completo em **[`AUTOMACAO.md`](./AUTOMACAO.md)**.
+
 ## Formas de usar
 
 | Formato | Para quê | Guia |

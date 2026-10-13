@@ -14,6 +14,7 @@ import Profiles from './pages/Profiles.jsx';
 import Reports from './pages/Reports.jsx';
 import Gmail from './pages/Gmail.jsx';
 import Settings from './pages/Settings.jsx';
+import Setup from './pages/Setup.jsx';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/relatorios" element={<Protected><Reports /></Protected>} />
       <Route path="/gmail" element={<Protected><Gmail /></Protected>} />
       <Route path="/configuracoes" element={<Protected><Settings /></Protected>} />
+      <Route path="/setup" element={<Protected><Setup /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

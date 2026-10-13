@@ -12,6 +12,7 @@
     "test": "node --test tests/*.test.js",
     "test:e2e": "bash tests/e2e-live.sh",
     "test:single": "bash tests/single-service.sh",
+    "test:auto": "bash tests/e2e-auto.sh",
     "verify:env": "bash tests/verify-env.sh"
   },
   "engines": {

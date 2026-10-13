@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS requests (
   gmail_thread_id  TEXT,                  -- REAL Gmail thread id once sent
   gmail_message_id TEXT,                  -- REAL Gmail message id once sent
   automation_id INTEGER,
+  -- Conversation lifecycle (end-to-end automation):
+  conversation_state TEXT NOT NULL DEFAULT 'open',
+    -- open | awaiting_info | needs_followup | resolved | closed | needs_admin
+  followup_count INTEGER NOT NULL DEFAULT 0,  -- follow-ups already sent
+  max_followups  INTEGER NOT NULL DEFAULT 3,  -- cap of follow-ups per conversation
+  last_classification TEXT,                   -- latest AI classification of a reply
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (service_id) REFERENCES services(id),
@@ -90,6 +96,7 @@ CREATE TABLE IF NOT EXISTS messages (
   gmail_thread_id  TEXT,
   approval_status TEXT,                   -- null | pending | approved | rejected | sent
   is_followup   INTEGER NOT NULL DEFAULT 0,
+  classification TEXT,                    -- AI classification (for inbound replies)
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE
 );
@@ -110,6 +117,8 @@ CREATE TABLE IF NOT EXISTS automations (
   recipient         TEXT,                             -- authorized destination
   require_approval  INTEGER NOT NULL DEFAULT 1,
   max_attempts      INTEGER NOT NULL DEFAULT 3,
+  auto_followup     INTEGER NOT NULL DEFAULT 0,  -- send follow-ups automatically
+  max_followups_per_conversation INTEGER NOT NULL DEFAULT 3,
   sent_today        INTEGER NOT NULL DEFAULT 0,
   sent_today_date   TEXT,
   last_run_at       TEXT,
@@ -142,5 +151,10 @@ CREATE TABLE IF NOT EXISTS settings (
   -- the local backend database.
   google_client_id     TEXT,
   google_client_secret TEXT,
+  -- Full-automation controls:
+  setup_completed      INTEGER NOT NULL DEFAULT 0,  -- single initial setup done
+  auto_mode            INTEGER NOT NULL DEFAULT 0,  -- end-to-end automatic flow on
+  auto_followup_approved INTEGER NOT NULL DEFAULT 0,-- admin authorized auto-send of follow-ups
+  poll_interval_minutes  INTEGER NOT NULL DEFAULT 2,-- Gmail reply polling interval
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );

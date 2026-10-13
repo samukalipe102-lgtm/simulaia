@@ -19,6 +19,8 @@ const FIELDS = [
   'recipient',
   'require_approval',
   'max_attempts',
+  'auto_followup',
+  'max_followups_per_conversation',
 ];
 
 router.get('/', (req, res) => {
@@ -66,9 +68,10 @@ router.put('/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Automação não encontrada.' });
   const b = req.body || {};
   const updates = {};
+  const BIT_FIELDS = ['require_approval', 'auto_followup'];
   for (const f of FIELDS) {
     if (b[f] !== undefined) {
-      updates[f] = f === 'require_approval' ? (b[f] ? 1 : 0) : b[f];
+      updates[f] = BIT_FIELDS.includes(f) ? (b[f] ? 1 : 0) : b[f];
     }
   }
   const keys = Object.keys(updates);

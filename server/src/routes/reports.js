@@ -2,7 +2,18 @@ import { Router } from 'express';
 import { db, getSettings } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getStatus as gmailStatus } from '../services/gmail.js';
+import { getRuntime } from '../jobs/scheduler.js';
 import { gmailConfigured } from '../config.js';
+
+// Derive a single, human-friendly automation state for the dashboard badge.
+function deriveAutomationState(settings, gmail) {
+  if (settings.emergency_stop) return 'erro'; // treated as halted/attention
+  if (!settings.setup_completed) return 'configuracao_pendente';
+  if (!gmail.connected) return 'aguardando_gmail';
+  if (!settings.auto_mode) return 'pausada';
+  if (!settings.auto_followup_approved) return 'aguardando_autorizacao';
+  return 'ativa';
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -49,16 +60,49 @@ router.get('/dashboard', (req, res) => {
     .prepare('SELECT category, COUNT(*) AS c FROM requests GROUP BY category')
     .all();
 
+  // Conversation-level counts for the automation dashboard.
+  const convRows = db
+    .prepare('SELECT conversation_state, COUNT(*) AS c FROM requests GROUP BY conversation_state')
+    .all();
+  const conversationStates = {};
+  convRows.forEach((r) => (conversationStates[r.conversation_state] = r.c));
+
+  const conversations = {
+    inProgress: db
+      .prepare(
+        `SELECT COUNT(*) AS c FROM requests
+         WHERE status IN ('awaiting_reply','replied','awaiting_approval')`,
+      )
+      .get().c,
+    repliesIdentified: db
+      .prepare(`SELECT COUNT(*) AS c FROM messages WHERE direction = 'inbound'`)
+      .get().c,
+    completed: db.prepare("SELECT COUNT(*) AS c FROM requests WHERE status = 'completed'").get().c,
+    awaitingApproval: db
+      .prepare("SELECT COUNT(*) AS c FROM requests WHERE status = 'awaiting_approval'").get().c,
+    needsAdmin: db
+      .prepare("SELECT COUNT(*) AS c FROM requests WHERE conversation_state = 'needs_admin'").get().c,
+    errors: db.prepare("SELECT COUNT(*) AS c FROM requests WHERE status = 'error'").get().c,
+  };
+
+  const settings = getSettings();
+  const gmail = { ...gmailStatus(), configured: gmailConfigured(settings) };
+  const runtime = getRuntime();
+
   res.json({
     statusCounts,
     totals,
+    conversations,
+    conversationStates,
     lastExecutions,
     recentFailures,
     nextRun: nextRun || null,
     byCategory,
-    gmail: { ...gmailStatus(), configured: gmailConfigured(getSettings()) },
+    gmail,
+    runtime,
+    automationState: deriveAutomationState(settings, gmail),
     settings: (() => {
-      const { google_client_secret, ...rest } = getSettings();
+      const { google_client_secret, ...rest } = settings;
       return { ...rest, google_client_secret_set: Boolean(google_client_secret) };
     })(),
   });

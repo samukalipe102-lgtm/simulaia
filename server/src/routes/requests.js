@@ -8,6 +8,7 @@ import {
   draftFollowUp,
   approveAndSendFollowUp,
   rejectFollowUp,
+  processConversations,
 } from '../services/requests.js';
 
 const router = Router();
@@ -75,6 +76,16 @@ router.post('/:id/send', async (req, res) => {
 router.post('/sync', async (req, res) => {
   try {
     const result = await syncReplies();
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Manually run the autonomous conversation engine (classify + decide next step).
+router.post('/process', async (req, res) => {
+  try {
+    const result = await processConversations();
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
