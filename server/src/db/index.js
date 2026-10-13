@@ -18,6 +18,15 @@ export function migrate() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
 
+  // Safe migrations for databases created before new columns were added.
+  const settingsCols = db.prepare('PRAGMA table_info(settings)').all().map((c) => c.name);
+  if (!settingsCols.includes('google_client_id')) {
+    db.exec('ALTER TABLE settings ADD COLUMN google_client_id TEXT');
+  }
+  if (!settingsCols.includes('google_client_secret')) {
+    db.exec('ALTER TABLE settings ADD COLUMN google_client_secret TEXT');
+  }
+
   // Ensure the singleton settings row exists.
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();
   if (!existing) {

@@ -5,8 +5,18 @@ import { requireAuth } from '../middleware/auth.js';
 const router = Router();
 router.use(requireAuth);
 
+// Never expose the Google client secret to the frontend. Return only whether it
+// is set, plus the client id (not secret).
+function sanitize(settings) {
+  const { google_client_secret, ...rest } = settings;
+  return {
+    ...rest,
+    google_client_secret_set: Boolean(google_client_secret),
+  };
+}
+
 router.get('/', (req, res) => {
-  res.json(getSettings());
+  res.json(sanitize(getSettings()));
 });
 
 router.put('/', (req, res) => {
@@ -18,7 +28,24 @@ router.put('/', (req, res) => {
     test_mode === undefined ? current.test_mode : test_mode ? 1 : 0,
     authorized_recipient === undefined ? current.authorized_recipient : authorized_recipient,
   );
-  res.json(getSettings());
+  res.json(sanitize(getSettings()));
+});
+
+// Save Google OAuth credentials from the UI (desktop mode). Stored only in the
+// local backend database; the secret is never returned to the client.
+router.put('/google', (req, res) => {
+  const { google_client_id, google_client_secret } = req.body || {};
+  const current = getSettings();
+  db.prepare(
+    `UPDATE settings SET google_client_id = ?, google_client_secret = ?,
+      updated_at = datetime('now') WHERE id = 1`,
+  ).run(
+    google_client_id === undefined ? current.google_client_id : (google_client_id || null),
+    // Empty string means "keep current"; a new value replaces it.
+    google_client_secret ? google_client_secret : current.google_client_secret,
+  );
+  log('info', 'gmail', 'Credenciais do Google atualizadas via interface.');
+  res.json(sanitize(getSettings()));
 });
 
 // Emergency stop: halt ALL automations immediately.

@@ -137,5 +137,10 @@ CREATE TABLE IF NOT EXISTS settings (
   emergency_stop     INTEGER NOT NULL DEFAULT 0,  -- 1 = all automations halted
   test_mode          INTEGER NOT NULL DEFAULT 1,
   authorized_recipient TEXT,
+  -- Google OAuth credentials configurable from the UI (desktop mode has no
+  -- terminal to edit .env). Falls back to env vars when empty. Stored only in
+  -- the local backend database.
+  google_client_id     TEXT,
+  google_client_secret TEXT,
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );

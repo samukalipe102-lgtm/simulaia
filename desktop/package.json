@@ -1,0 +1,55 @@
+{
+  "name": "simula-escola-ia-desktop",
+  "version": "1.0.0",
+  "description": "Simula Escola IA — aplicativo de desktop (Windows) via Electron.",
+  "author": "Simula Escola IA",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64",
+    "dist:portable": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.simulaescola.ia",
+    "productName": "Simula Escola IA",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html"
+    ],
+    "extraResources": [
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": ["**/*", "!node_modules/.cache/**", "!data/**", "!tests/**", "!.env"]
+      },
+      {
+        "from": "../client/dist",
+        "to": "client-dist"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Simula Escola IA"
+    }
+  }
+}

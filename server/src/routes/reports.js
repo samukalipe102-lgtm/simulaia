@@ -56,8 +56,11 @@ router.get('/dashboard', (req, res) => {
     recentFailures,
     nextRun: nextRun || null,
     byCategory,
-    gmail: { ...gmailStatus(), configured: gmailConfigured() },
-    settings: getSettings(),
+    gmail: { ...gmailStatus(), configured: gmailConfigured(getSettings()) },
+    settings: (() => {
+      const { google_client_secret, ...rest } = getSettings();
+      return { ...rest, google_client_secret_set: Boolean(google_client_secret) };
+    })(),
   });
 });
 
