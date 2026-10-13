@@ -1,0 +1,30 @@
+# Sobe backend + frontend com um comando: docker compose up -d --build
+# Acesse http://localhost:8080
+
+services:
+  backend:
+    build:
+      context: ./server
+    restart: always            # mantém o agendador sempre ativo
+    env_file:
+      - ./server/.env          # crie a partir de server/.env.example
+    environment:
+      # Em produção o CORS não é necessário (mesmo host via Nginx), mas deixamos
+      # a origem do front liberada por garantia.
+      CLIENT_ORIGIN: http://localhost:8080
+    volumes:
+      - simula_data:/app/data  # banco SQLite persistente
+    expose:
+      - "4000"
+
+  frontend:
+    build:
+      context: ./client
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  simula_data:
