@@ -72,11 +72,23 @@ test('Settings: test mode defaults and emergency flag togglable', () => {
 
 const { createSimulatedRequest, isDuplicate } = await import('../src/services/requests.js');
 
-test('Requests: createSimulatedRequest persists a fictitious request', async () => {
+test('Requests: createSimulatedRequest persists a request (simulation path)', async () => {
+  // Com modo real desligado, a solicitação é marcada como fictícia.
+  db.prepare('UPDATE settings SET real_mode = 0 WHERE id = 1').run();
   const r = await createSimulatedRequest({});
   assert.ok(r.public_id.startsWith('SIM-'));
   assert.equal(r.fictitious, 1);
   assert.equal(r.status, 'generated');
+});
+
+test('Requests: real mode produces a non-fictitious request with clean subject', async () => {
+  db.prepare('UPDATE settings SET real_mode = 1 WHERE id = 1').run();
+  // garante ao menos um responsável real cadastrado para ser remetente
+  db.prepare("INSERT OR IGNORE INTO guardians (name) VALUES ('Fulano Responsável Real')").run();
+  const r = await createSimulatedRequest({});
+  assert.equal(r.fictitious, 0);
+  assert.ok(!r.subject.includes('[SIMULAÇÃO]'));
+  db.prepare('UPDATE settings SET real_mode = 0 WHERE id = 1').run(); // restaura para os demais testes
 });
 
 test('Requests: duplicate detection blocks repeat subject to same recipient', () => {

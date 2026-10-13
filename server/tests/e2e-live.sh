@@ -50,12 +50,21 @@ AUTH="Authorization: Bearer $TOKEN"
 OK=$(curl -s -o /dev/null -w '%{http_code}' $B/services -H "$AUTH")
 check "token válido acessa rota protegida (200)" "$OK" "200"
 
-echo "2) Geração de solicitação fictícia (IA)"
+echo "2) Geração de solicitação (IA)"
+# Caminho de simulação (modo real desligado): marca [SIMULAÇÃO] e fictícia.
+curl -s -X PUT $B/settings -H "$AUTH" -H 'Content-Type: application/json' -d '{"real_mode":false}' >/dev/null
 GEN=$(curl -s -X POST $B/requests/generate -H "$AUTH" -H 'Content-Type: application/json' -d '{}')
 FIC=$(echo "$GEN" | jq_node ".fictitious")
-check "solicitação marcada como fictícia" "$FIC" "1"
+check "modo simulação: solicitação marcada como fictícia" "$FIC" "1"
 SUBJ=$(echo "$GEN" | jq_node ".subject")
-case "$SUBJ" in "[SIMULAÇÃO]"*) check "assunto marcado [SIMULAÇÃO]" "ok" "ok";; *) check "assunto marcado [SIMULAÇÃO]" "$SUBJ" "ok";; esac
+case "$SUBJ" in "[SIMULAÇÃO]"*) check "modo simulação: assunto com [SIMULAÇÃO]" "ok" "ok";; *) check "modo simulação: assunto com [SIMULAÇÃO]" "$SUBJ" "ok";; esac
+
+# Caminho real (modo profissional): sem [SIMULAÇÃO] e não fictícia.
+curl -s -X PUT $B/settings -H "$AUTH" -H 'Content-Type: application/json' -d '{"real_mode":true}' >/dev/null
+GENR=$(curl -s -X POST $B/requests/generate -H "$AUTH" -H 'Content-Type: application/json' -d '{}')
+check "modo real: solicitação NÃO fictícia" "$(echo "$GENR" | jq_node '.fictitious')" "0"
+SUBJR=$(echo "$GENR" | jq_node ".subject")
+case "$SUBJR" in "[SIMULAÇÃO]"*) check "modo real: assunto SEM [SIMULAÇÃO]" "tem-marcador" "ok";; *) check "modo real: assunto SEM [SIMULAÇÃO]" "ok" "ok";; esac
 
 echo "3) Configurações / modo de teste"
 SET=$(curl -s -X PUT $B/settings -H "$AUTH" -H 'Content-Type: application/json' -d '{"test_mode":true,"authorized_recipient":"authorized@example.com"}')
