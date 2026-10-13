@@ -149,3 +149,18 @@ test('Emergency stop blocks the conversation engine', async () => {
   assert.equal(res.reason, 'emergency_stop');
   db.prepare('UPDATE settings SET emergency_stop=0 WHERE id=1').run();
 });
+
+test('Modo real: e-mail enviado NÃO contém marcadores de simulação', async () => {
+  db.prepare('UPDATE settings SET real_mode = 1 WHERE id = 1').run();
+  db.prepare("INSERT OR IGNORE INTO guardians (name) VALUES ('Responsável Verdadeiro')").run();
+  const r = await requests.createSimulatedRequest({});
+  // injeta assunto sujo de propósito para testar a rede de segurança
+  db.prepare("UPDATE requests SET subject = '[SIMULAÇÃO] Teste real', body = body || '\n\n---\nMensagem gerada para fins de teste e simulação. Não representa pessoa real.' WHERE id = ?").run(r.id);
+  const sent = await requests.sendRequest(r.id);
+  // mensagem efetivamente armazenada/enviada
+  const msg = db.prepare("SELECT * FROM messages WHERE request_id=? AND direction='outbound' ORDER BY id DESC LIMIT 1").get(r.id);
+  assert.ok(!sent.subject.includes('[SIMULAÇÃO]'));
+  assert.ok(!msg.subject.includes('[SIMULAÇÃO]'));
+  assert.doesNotMatch(msg.body, /perfil fict[íi]cio|fins de teste|simula[çc][ãa]o|n[ãa]o representa/i);
+  db.prepare('UPDATE settings SET real_mode = 0 WHERE id = 1').run();
+});

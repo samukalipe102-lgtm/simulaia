@@ -11,6 +11,18 @@ import {
 import * as gmail from './gmail.js';
 import { applySignature } from './edugestao.js';
 
+// Remove quaisquer marcadores de simulação do assunto/corpo (rede de segurança
+// para o modo real, mesmo que o conteúdo tenha sido gerado antes).
+function stripSimulationMarkers(text) {
+  if (!text) return text;
+  let t = text;
+  t = t.replace(/\[SIMULA[ÇC][ÃA]O\]\s*/gi, '');
+  t = t.replace(/\s*\(perfil fict[íi]cio\s*\/\s*simula[çc][ãa]o\)/gi, '');
+  // Remove bloco de rodapé de teste/simulação (a partir de '---' se mencionar teste/simulação/fictício)
+  t = t.replace(/\n*-{2,}\n[\s\S]*?(fins de teste|simula[çc][ãa]o|fict[íi]ci|n[ãa]o representa)[\s\S]*$/i, '');
+  return t.trimEnd();
+}
+
 function nextPublicId() {
   const year = new Date().getFullYear();
   const row = db
@@ -60,8 +72,19 @@ export async function createSimulatedRequest(opts = {}) {
   const settings = getSettings();
   const realMode = Boolean(settings.real_mode);
 
-  const llm = await generateWithLLM({ service, profile, realMode }).catch(() => null);
-  const content = llm || generateRequestContent({ service, profile, realMode });
+  // Em modo real, usa um nome REAL de responsável (do cadastro) como remetente,
+  // em vez dos perfis de exemplo. Mantém o papel 'responsavel'.
+  let sender = { name: profile.name, role: profile.role };
+  if (realMode) {
+    const guardian = db
+      .prepare('SELECT name FROM guardians ORDER BY RANDOM() LIMIT 1')
+      .get();
+    if (guardian?.name) sender = { name: guardian.name, role: 'responsavel' };
+  }
+
+  const genProfile = { ...profile, name: sender.name, role: sender.role };
+  const llm = await generateWithLLM({ service, profile: genProfile, realMode }).catch(() => null);
+  const content = llm || generateRequestContent({ service, profile: genProfile, realMode });
 
   const dest = recipient || settings.authorized_recipient || null;
   const publicId = nextPublicId();
@@ -80,8 +103,8 @@ export async function createSimulatedRequest(opts = {}) {
       content.category,
       service.id,
       profile.id,
-      profile.name,
-      profile.role,
+      sender.name,
+      sender.role,
       dest,
       realMode ? 0 : 1,
       automationId,
@@ -145,27 +168,31 @@ export async function sendRequest(requestId) {
       updated_at = datetime('now') WHERE id = ?`,
   ).run(recipient, request.id);
 
+  // Em modo real, limpa qualquer marcador de simulação remanescente.
+  const realMode = Boolean(settings.real_mode);
+  const cleanSubject = realMode ? stripSimulationMarkers(request.subject) : request.subject;
+  const cleanBody = realMode ? stripSimulationMarkers(request.body) : request.body;
   // Aplica a assinatura institucional padrão (sem duplicar).
-  const bodyWithSignature = applySignature(request.body);
+  const bodyWithSignature = applySignature(cleanBody);
 
   try {
     const { messageId, threadId } = await gmail.sendEmail({
       to: recipient,
-      subject: request.subject,
+      subject: cleanSubject,
       body: bodyWithSignature,
     });
 
     db.prepare(
-      `UPDATE requests SET status = 'awaiting_reply', sent_at = datetime('now'),
-        gmail_message_id = ?, gmail_thread_id = ?, last_error = NULL,
+      `UPDATE requests SET status = 'awaiting_reply', subject = ?, body = ?,
+        sent_at = datetime('now'), gmail_message_id = ?, gmail_thread_id = ?, last_error = NULL,
         updated_at = datetime('now') WHERE id = ?`,
-    ).run(messageId, threadId, request.id);
+    ).run(cleanSubject, bodyWithSignature, messageId, threadId, request.id);
 
     db.prepare(
       `INSERT INTO messages
         (request_id, direction, author, subject, body, gmail_message_id, gmail_thread_id, approval_status)
        VALUES (?, 'outbound', ?, ?, ?, ?, ?, 'sent')`,
-    ).run(request.id, request.profile_name, request.subject, bodyWithSignature, messageId, threadId);
+    ).run(request.id, request.profile_name, cleanSubject, bodyWithSignature, messageId, threadId);
 
     log('info', 'gmail', `E-mail enviado (${request.public_id}) thread=${threadId}`, {
       requestId: request.id,

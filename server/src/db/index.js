@@ -46,7 +46,8 @@ export function migrate() {
   ensureColumn('settings', 'auto_followup_approved', 'INTEGER NOT NULL DEFAULT 0');
   // real_mode: quando ligado, as mensagens são profissionais (sem rótulos de
   // simulação). O destinatário continua restrito ao autorizado (sua caixa).
-  ensureColumn('settings', 'real_mode', 'INTEGER NOT NULL DEFAULT 0');
+  // Padrão agora é LIGADO — mensagens com aparência real por padrão.
+  ensureColumn('settings', 'real_mode', 'INTEGER NOT NULL DEFAULT 1');
   // How often the server polls Gmail for new replies (minutes).
   ensureColumn('settings', 'poll_interval_minutes', 'INTEGER NOT NULL DEFAULT 2');
 
@@ -68,9 +69,17 @@ export function migrate() {
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();
   if (!existing) {
     db.prepare(
-      `INSERT INTO settings (id, emergency_stop, test_mode, authorized_recipient)
-       VALUES (1, 0, ?, ?)`,
+      `INSERT INTO settings (id, emergency_stop, test_mode, authorized_recipient, real_mode)
+       VALUES (1, 0, ?, ?, 1)`,
     ).run(config.testMode ? 1 : 0, config.authorizedRecipient || null);
+  }
+
+  // Migração única: liga o modo real em bancos antigos (o usuário quer mensagens
+  // reais por padrão). Executa só uma vez, controlada por real_mode_migrated.
+  ensureColumn('settings', 'real_mode_migrated', 'INTEGER NOT NULL DEFAULT 0');
+  const row = db.prepare('SELECT real_mode_migrated FROM settings WHERE id = 1').get();
+  if (row && !row.real_mode_migrated) {
+    db.prepare('UPDATE settings SET real_mode = 1, real_mode_migrated = 1 WHERE id = 1').run();
   }
 }
 
