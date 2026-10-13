@@ -1,7 +1,46 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { Card, CardHeader, Button, Input, Spinner } from '../components/ui.jsx';
+import { Card, CardHeader, Button, Input, Toggle, Spinner } from '../components/ui.jsx';
+
+function ForwardingCard() {
+  const [fwd, setFwd] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  useEffect(() => { api.get('/central/forwarding').then(setFwd); }, []);
+  async function save() {
+    setBusy(true); setMsg('');
+    try { await api.put('/central/forwarding', fwd); setMsg('Fluxo de e-mail salvo.'); }
+    catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  if (!fwd) return null;
+  return (
+    <Card>
+      <CardHeader title="Fluxo de e-mail (Outlook oficial → Gmail de apoio)"
+        subtitle="O Outlook atende; o Gmail recebe as encaminhadas e as cópias. O encaminhamento é configurado no Outlook." />
+      <div className="p-5 space-y-4">
+        <Input label="E-mail oficial de atendimento (Outlook)" value={fwd.official_email || ''}
+          onChange={(e) => setFwd({ ...fwd, official_email: e.target.value })} placeholder="admsedugestao@outlook.com" />
+        <Input label="E-mail de apoio/arquivo (Gmail conectado)" value={fwd.archive_email || ''}
+          onChange={(e) => setFwd({ ...fwd, archive_email: e.target.value })} placeholder="adminedugestao@gmail.com" />
+        <Toggle checked={!!fwd.forwarding_enabled} onChange={(v) => setFwd({ ...fwd, forwarding_enabled: v })}
+          label="Reconhecer solicitações encaminhadas do Outlook" />
+        <Toggle checked={!!fwd.response_copy_enabled} onChange={(v) => setFwd({ ...fwd, response_copy_enabled: v })}
+          label="Reconhecer cópias de respostas enviadas pelo Outlook" />
+        {msg && <div className="text-sm bg-slate-100 rounded-lg px-3 py-2">{msg}</div>}
+        <Button onClick={save} disabled={busy}>Salvar fluxo</Button>
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          ⚙️ <strong>Ação necessária no Outlook (uma vez):</strong> ative o encaminhamento
+          automático de <strong>{fwd.official_email || 'seu Outlook'}</strong> para
+          <strong> {fwd.archive_email || 'seu Gmail'}</strong> em
+          <em> Outlook → Configurações → Encaminhamento</em> (ou crie uma Regra de caixa de entrada).
+          Para as cópias das respostas, inclua o Gmail em Cco ao responder, ou crie uma regra para
+          mensagens enviadas. O EduGestão lê do Gmail e identifica o remetente original.
+        </p>
+      </div>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
@@ -49,6 +88,8 @@ export default function Settings() {
           <Link to="/gmail"><Button variant="secondary">Abrir Integração Gmail</Button></Link>
         </div>
       </Card>
+
+      <ForwardingCard />
 
       <Card>
         <CardHeader title="Sincronização e cópia administrativa" />

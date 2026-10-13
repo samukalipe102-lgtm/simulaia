@@ -153,3 +153,45 @@ test('Emergência bloqueia a fila administrativa', async () => {
   assert.equal(r.reason, 'emergency_stop');
   db.prepare('UPDATE settings SET emergency_stop=0 WHERE id=1').run();
 });
+
+test('Fluxo Outlook→Gmail: e-mail encaminhado vira processo com remetente ORIGINAL', async () => {
+  db.prepare("UPDATE settings SET official_email='admsedugestao@outlook.com' WHERE id=1").run();
+  inbox = [{
+    from: 'Atendimento <admsedugestao@outlook.com>',  // encaminhado pelo Outlook
+    subject: 'Enc: Declaração de frequência',
+    body: [
+      'Encaminhando solicitação recebida.',
+      '',
+      'De: Carlos Souza <carlos.souza@exemplo.com>',
+      'Enviada em: 13 de outubro de 2026 08:30',
+      'Para: admsedugestao@outlook.com',
+      'Assunto: Declaração de frequência',
+      '',
+      'Prezados, solicito a declaração de frequência da minha filha.',
+    ].join('\n'),
+    snippet: 'Encaminhando...',
+    gmailMessageId: 'fwd-1',
+    gmailThreadId: 'thread-fwd-1',
+    internalDate: Date.now(),
+    attachments: [],
+  }];
+  threads['thread-fwd-1'] = [
+    { direction: 'inbound', from: 'Atendimento <admsedugestao@outlook.com>', subject: 'Enc: Declaração de frequência', body: inbox[0].body, gmailMessageId: 'fwd-1', gmailThreadId: 'thread-fwd-1', attachments: [] },
+  ];
+  const r = await inboxSvc.syncInbox();
+  assert.ok(r.processes >= 1);
+  const proc = db.prepare("SELECT * FROM requests WHERE gmail_thread_id='thread-fwd-1'").get();
+  assert.equal(proc.origin_kind, 'forwarded_request');
+  // mostra o remetente REAL (aluno/responsável), não o Outlook
+  assert.equal(proc.sender_email, 'carlos.souza@exemplo.com');
+  assert.equal(proc.original_sender_email, 'carlos.souza@exemplo.com');
+  assert.equal(proc.profile_name, 'Carlos Souza');
+  assert.equal(proc.subject, 'Declaração de frequência'); // sem "Enc:"
+  assert.match(proc.body, /declaração de frequência da minha filha/i);
+});
+
+test('Fluxo Outlook→Gmail: não duplica ao re-sincronizar o encaminhado', async () => {
+  const before = db.prepare('SELECT COUNT(*) AS c FROM requests').get().c;
+  await inboxSvc.syncInbox();
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM requests').get().c, before);
+});
