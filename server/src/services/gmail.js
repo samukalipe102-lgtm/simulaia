@@ -290,3 +290,73 @@ export async function testConnection() {
   const res = await gmail.users.getProfile({ userId: 'me' });
   return { emailAddress: res.data.emailAddress, messagesTotal: res.data.messagesTotal };
 }
+
+// Extrai metadados de anexos de um payload do Gmail (recursivo).
+function extractAttachments(payload, out = []) {
+  if (!payload) return out;
+  if (payload.filename && payload.body?.attachmentId) {
+    out.push({
+      filename: payload.filename,
+      mimeType: payload.mimeType,
+      size: payload.body.size || 0,
+      attachmentId: payload.body.attachmentId,
+    });
+  }
+  for (const part of payload.parts || []) extractAttachments(part, out);
+  return out;
+}
+
+/**
+ * Lista as mensagens RECEBIDAS recentes (caixa de entrada), excluindo as
+ * enviadas pela própria conta. Usada para transformar e-mails em processos.
+ * Retorna { from, subject, body, snippet, gmailMessageId, gmailThreadId,
+ * internalDate, attachments[] }.
+ */
+export async function listInbox({ max = 25, query = 'in:inbox -category:promotions' } = {}) {
+  if (transport?.listInbox) return transport.listInbox({ max, query });
+  const client = await getAuthedClient();
+  const gmail = google.gmail({ version: 'v1', auth: client });
+  const account = getAccountRow();
+  const myEmail = (account?.email || '').toLowerCase();
+
+  const list = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: max });
+  const out = [];
+  for (const ref of list.data.messages || []) {
+    const m = await gmail.users.messages.get({ userId: 'me', id: ref.id, format: 'full' });
+    const headers = Object.fromEntries(
+      (m.data.payload?.headers || []).map((h) => [h.name.toLowerCase(), h.value]),
+    );
+    const from = headers.from || '';
+    // ignora mensagens enviadas pela própria conta
+    if (myEmail && from.toLowerCase().includes(myEmail)) continue;
+    out.push({
+      from,
+      subject: headers.subject || '(sem assunto)',
+      body: extractPlainBody(m.data.payload),
+      snippet: m.data.snippet,
+      gmailMessageId: m.data.id,
+      gmailThreadId: m.data.threadId,
+      internalDate: Number(m.data.internalDate || 0),
+      attachments: extractAttachments(m.data.payload),
+    });
+  }
+  return out;
+}
+
+/** Baixa o conteúdo de um anexo específico (base64url). */
+export async function getAttachment(gmailMessageId, attachmentId) {
+  const client = await getAuthedClient();
+  const gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.messages.attachments.get({
+    userId: 'me',
+    messageId: gmailMessageId,
+    id: attachmentId,
+  });
+  return res.data; // { size, data(base64url) }
+}
+
+/** Envia um e-mail administrativo simples (sem thread). Retorna id real. */
+export async function sendAdminEmail({ to, subject, body }) {
+  if (transport?.sendEmail) return transport.sendEmail({ to, subject, body });
+  return sendEmail({ to, subject, body });
+}

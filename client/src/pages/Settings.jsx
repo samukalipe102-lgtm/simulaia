@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { Card, CardHeader, Button, Input, Toggle, Spinner } from '../components/ui.jsx';
+import { Card, CardHeader, Button, Input, Spinner } from '../components/ui.jsx';
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
@@ -15,72 +16,60 @@ export default function Settings() {
     setBusy(true); setMsg('');
     try {
       await api.put('/settings', {
-        test_mode: !!settings.test_mode,
         authorized_recipient: settings.authorized_recipient,
+        poll_interval_minutes: Number(settings.poll_interval_minutes) || 2,
       });
       setMsg('Configurações salvas.');
       await load();
-    } catch (e) { setMsg(e.message); }
-    finally { setBusy(false); }
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
   }
-
   async function emergency(action) {
     setBusy(true); setMsg('');
-    try {
-      await api.post(`/settings/${action}`);
-      await load();
-      setMsg(action === 'emergency-stop' ? '🛑 Automações interrompidas.' : 'Parada de emergência liberada.');
-    } catch (e) { setMsg(e.message); }
-    finally { setBusy(false); }
+    try { await api.post(`/settings/${action}`); await load(); setMsg(action === 'emergency-stop' ? '🛑 Envios automáticos interrompidos.' : 'Parada de emergência liberada.'); }
+    catch (e) { setMsg(e.message); } finally { setBusy(false); }
   }
-
   async function changePassword(e) {
     e.preventDefault();
     setBusy(true); setMsg('');
-    try {
-      await api.post('/auth/change-password', pwd);
-      setPwd({ currentPassword: '', newPassword: '' });
-      setMsg('Senha alterada com sucesso.');
-    } catch (e) { setMsg(e.message); }
-    finally { setBusy(false); }
+    try { await api.post('/auth/change-password', pwd); setPwd({ currentPassword: '', newPassword: '' }); setMsg('Senha alterada com sucesso.'); }
+    catch (e) { setMsg(e.message); } finally { setBusy(false); }
   }
 
   if (!settings) return <Spinner />;
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-bold text-slate-800">Configurações e segurança</h1>
+      <h1 className="text-xl font-bold text-slate-800">Configurações</h1>
       {msg && <div className="text-sm bg-slate-100 rounded-lg px-3 py-2">{msg}</div>}
 
       <Card>
-        <CardHeader title="Modo de teste e destinatário autorizado" />
+        <CardHeader title="Conexão Gmail" subtitle="Integração oficial via OAuth 2.0" />
+        <div className="p-5 text-sm text-slate-600 flex items-center justify-between">
+          <span>Conecte e gerencie a conta de e-mail na página de integração.</span>
+          <Link to="/gmail"><Button variant="secondary">Abrir Integração Gmail</Button></Link>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Sincronização e cópia administrativa" />
         <div className="p-5 space-y-4">
-          <Toggle checked={!!settings.test_mode} onChange={(v) => setSettings({ ...settings, test_mode: v ? 1 : 0 })}
-            label="Modo de teste (envia SOMENTE para o destinatário autorizado)" />
-          <Input label="Destinatário autorizado (sua caixa de e-mail)"
+          <Input label="E-mail para cópia administrativa / destinatário autorizado"
             value={settings.authorized_recipient || ''}
             onChange={(e) => setSettings({ ...settings, authorized_recipient: e.target.value })}
-            placeholder="voce@gmail.com" />
+            placeholder="adminedugestao@gmail.com" />
+          <Input label="Intervalo de verificação da caixa (minutos)" type="number" min="1"
+            value={settings.poll_interval_minutes || 2}
+            onChange={(e) => setSettings({ ...settings, poll_interval_minutes: e.target.value })} />
           <Button onClick={save} disabled={busy}>Salvar</Button>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="Formato das mensagens" subtitle="Aparência profissional vs. rótulo de simulação" />
-        <div className="p-5 space-y-3">
-          <Toggle checked={!!settings.real_mode} onChange={(v) => setSettings({ ...settings, real_mode: v ? 1 : 0 })}
-            label="Modo profissional (remove “[SIMULAÇÃO]”, rodapé de teste e “perfil fictício”)" />
           <p className="text-xs text-slate-500">
-            Com o modo profissional ligado, as mensagens saem com aparência de atendimento real
-            (sem marcadores de simulação). <strong>O destinatário continua sendo apenas a sua caixa
-            autorizada</strong> — não há envio para terceiros. Lembre de clicar em “Salvar”.
+            O sistema sincroniza os e-mails recebidos e as respostas que você envia pelo Gmail.
+            Ele <strong>nunca</strong> responde automaticamente a alunos ou responsáveis.
           </p>
-          <Button onClick={save} disabled={busy}>Salvar</Button>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="Parada de emergência" subtitle="Interrompe imediatamente todas as automações" />
+        <CardHeader title="Parada de emergência" subtitle="Interrompe imediatamente os envios automáticos administrativos" />
         <div className="p-5 flex items-center gap-3">
           {settings.emergency_stop ? (
             <>

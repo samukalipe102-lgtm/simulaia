@@ -65,6 +65,18 @@ export function migrate() {
   ensureColumn('automations', 'auto_followup', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('automations', 'max_followups_per_conversation', 'INTEGER NOT NULL DEFAULT 3');
 
+  // Reforma "central de acompanhamento": origem do processo e flags de anexos.
+  // source: 'inbound' (recebido por e-mail) | 'generated' (legado) | 'admin'
+  ensureColumn('requests', 'source', "TEXT NOT NULL DEFAULT 'generated'");
+  ensureColumn('requests', 'sender_email', 'TEXT');  // e-mail do remetente (inbound)
+  ensureColumn('messages', 'has_attachments', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Garante a linha única de configuração da automação administrativa.
+  const adminCfg = db.prepare('SELECT id FROM admin_automation WHERE id = 1').get();
+  if (!adminCfg) {
+    db.prepare('INSERT INTO admin_automation (id) VALUES (1)').run();
+  }
+
   // Ensure the singleton settings row exists.
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();
   if (!existing) {

@@ -5,15 +5,11 @@ import { api } from '../lib/api.js';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
-  { to: '/setup', label: 'Configuração inicial', icon: '🪄' },
-  { to: '/conversas', label: 'Caixa de entrada', icon: '✉️' },
-  { to: '/solicitacoes', label: 'Solicitações', icon: '📝' },
   { to: '/processos', label: 'Processos escolares', icon: '🗂️' },
-  { to: '/alunos', label: 'Alunos e responsáveis', icon: '🎓' },
-  { to: '/assinaturas', label: 'Assinaturas', icon: '✍️' },
-  { to: '/automacoes', label: 'Automações', icon: '⚙️' },
-  { to: '/relatorios', label: 'Relatórios', icon: '📈' },
-  { to: '/gmail', label: 'Integração Gmail', icon: '📧' },
+  { to: '/caixa-entrada', label: 'Caixa de entrada', icon: '✉️' },
+  { to: '/respostas', label: 'Respostas enviadas', icon: '↩️' },
+  { to: '/documentos', label: 'Documentos', icon: '📎' },
+  { to: '/automacao', label: 'Automação', icon: '⚙️' },
   { to: '/configuracoes', label: 'Configurações', icon: '🔐' },
 ];
 

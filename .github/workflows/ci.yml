@@ -41,6 +41,9 @@ jobs:
       - name: Testes end-to-end do EduGestão
         run: npm run test:edu
 
+      - name: Testes end-to-end da central (processos/caixa/automação)
+        run: npm run test:central
+
       - name: Build do frontend (para o teste de serviço único)
         working-directory: client
         run: npm ci && npm run build

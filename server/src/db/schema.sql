@@ -212,3 +212,56 @@ CREATE TABLE IF NOT EXISTS signatures (
   enabled     INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ============================================================
+-- EduGestão Atendimento — central de acompanhamento (reforma)
+-- ============================================================
+
+-- Fila de ENVIOS ADMINISTRATIVOS automáticos (separada do atendimento).
+-- O agendador consome esta fila respeitando limite diário e intervalo em minutos.
+-- NUNCA é usada para responder solicitações de alunos/responsáveis.
+CREATE TABLE IF NOT EXISTS admin_queue (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  recipient     TEXT NOT NULL,              -- destinatário autorizado (ex.: cópia administrativa)
+  subject       TEXT NOT NULL,
+  body          TEXT NOT NULL,
+  dedupe_key    TEXT UNIQUE,                -- prevenção de duplicidade (reenvio após falha/reinício)
+  status        TEXT NOT NULL DEFAULT 'pending', -- pending | processing | sent | failed
+  attempts      INTEGER NOT NULL DEFAULT 0,
+  max_attempts  INTEGER NOT NULL DEFAULT 3,
+  last_error    TEXT,
+  gmail_message_id TEXT,
+  scheduled_after  TEXT,                    -- não enviar antes deste horário (ISO)
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  sent_at       TEXT
+);
+
+-- Configuração da automação ADMINISTRATIVA (única linha id=1).
+CREATE TABLE IF NOT EXISTS admin_automation (
+  id               INTEGER PRIMARY KEY CHECK (id = 1),
+  status           TEXT NOT NULL DEFAULT 'paused',  -- active | paused
+  daily_limit      INTEGER NOT NULL DEFAULT 20,
+  interval_minutes INTEGER NOT NULL DEFAULT 10,
+  start_hour       INTEGER NOT NULL DEFAULT 8,
+  end_hour         INTEGER NOT NULL DEFAULT 18,
+  allowed_days     TEXT NOT NULL DEFAULT '1,2,3,4,5',
+  sent_today       INTEGER NOT NULL DEFAULT 0,
+  sent_today_date  TEXT,
+  last_sent_at     TEXT,
+  updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Anexos de mensagens (recebidos ou enviados), associados ao processo.
+CREATE TABLE IF NOT EXISTS attachments (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id    INTEGER,                    -- processo associado
+  message_id    INTEGER,                    -- mensagem associada (messages.id)
+  gmail_message_id TEXT,                     -- id real da mensagem no Gmail
+  gmail_attachment_id TEXT,                  -- id real do anexo (para download sob demanda)
+  filename      TEXT,
+  mime_type     TEXT,
+  size_bytes    INTEGER,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE
+);
