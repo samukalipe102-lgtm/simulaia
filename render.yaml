@@ -1,0 +1,67 @@
+# Render Blueprint — Simula Escola IA
+# Deploy de serviço ÚNICO: o backend serve a API e também o frontend já buildado.
+# O agendador roda sempre (processo always-on). Disco persistente guarda o SQLite.
+#
+# Como usar:
+# 1. No Render (https://dashboard.render.com) → New → Blueprint → conecte este repo.
+# 2. O Render lê este arquivo e cria o serviço automaticamente.
+# 3. Preencha as variáveis marcadas como "sync: false" (segredos) no painel.
+# 4. Após o 1º deploy, pegue a URL pública e ajuste GOOGLE_REDIRECT_URI + CLIENT_ORIGIN
+#    (veja DEPLOYMENT.md), e cadastre a redirect URI no Google Cloud.
+
+services:
+  - type: web
+    name: simula-escola-ia
+    runtime: node
+    plan: starter            # "starter" mantém o processo ativo (agendador 24h)
+    region: oregon           # troque se preferir outra região
+    branch: main
+    # Instala backend + builda o frontend
+    buildCommand: |
+      cd server && npm ci
+      cd ../client && npm ci && npm run build
+    # Sobe o backend, que serve a API e o frontend buildado
+    startCommand: cd server && npm run seed:prod && npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: simula-data
+      mountPath: /opt/render/project/src/server/data   # SQLite persistente
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      # Caminho do build do frontend (gerado no buildCommand)
+      - key: CLIENT_DIST
+        value: /opt/render/project/src/client/dist
+      - key: DATABASE_FILE
+        value: /opt/render/project/src/server/data/simula.db
+      # JWT_SECRET forte gerado automaticamente pelo Render
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: TEST_MODE
+        value: "true"
+      # ---- Segredos: preencha no painel do Render (não ficam no repo) ----
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: AUTHORIZED_RECIPIENT
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Defina DEPOIS do 1º deploy, com a URL pública do Render:
+      #   https://SEU-APP.onrender.com/api/gmail/oauth/callback
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      # Opcional (LLM). Deixe vazio para o gerador offline.
+      - key: OPENAI_API_KEY
+        sync: false

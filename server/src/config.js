@@ -48,6 +48,10 @@ export const config = {
   testMode: bool(process.env.TEST_MODE, true),
   authorizedRecipient: process.env.AUTHORIZED_RECIPIENT || '',
 
+  // Optional: absolute path to the built frontend (client/dist). When set and
+  // present, the backend serves the UI as a single service (prod deploy).
+  clientDist: process.env.CLIENT_DIST || '',
+
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
