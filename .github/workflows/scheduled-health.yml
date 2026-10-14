@@ -1,0 +1,82 @@
+name: Manutenção agendada (saúde + testes)
+
+# Roda sozinho, no servidor do GitHub, mesmo com o app/computador do admin
+# fechado. Executa a suíte completa + build. Em caso de falha, abre uma issue
+# com os detalhes. NÃO altera código sozinho — apenas verifica e avisa.
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # de hora em hora
+  workflow_dispatch:        # permite rodar manualmente
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar backend
+        working-directory: server
+        run: npm ci
+
+      - name: Preparar ambiente
+        working-directory: server
+        run: cp .env.example .env
+
+      - name: Testes unit/integração
+        working-directory: server
+        run: npm test
+
+      - name: Testes end-to-end
+        working-directory: server
+        run: |
+          npm run test:e2e
+          npm run test:central
+          npm run test:activation
+          npm run test:updates
+          npm run test:edu
+
+      - name: Build do frontend
+        working-directory: client
+        run: npm ci && npm run build
+
+      # Se qualquer passo acima falhar, abre/atualiza uma issue de alerta.
+      - name: Abrir issue em caso de falha
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🔴 Manutenção agendada falhou — ${new Date().toISOString().slice(0,10)}`;
+            const body = [
+              'A verificação automática agendada detectou uma falha.',
+              '',
+              `- Workflow: ${context.workflow}`,
+              `- Execução: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Revise os logs da execução acima. Nenhuma alteração de código foi feita automaticamente.',
+            ].join('\n');
+            // Evita duplicar: procura issue aberta com o mesmo rótulo.
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'manutencao-automatica',
+            });
+            if (existing.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ['manutencao-automatica'],
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: `Nova falha detectada: ${body}`,
+              });
+            }

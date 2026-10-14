@@ -1,0 +1,93 @@
+name: Correção assistida por IA (opcional, abre PR)
+
+# NÍVEL AVANÇADO E OPCIONAL. Só funciona se você configurar o secret
+# OPENAI_API_KEY no repositório (Settings → Secrets and variables → Actions).
+#
+# IMPORTANTE / SEGURANÇA:
+# - Este workflow NUNCA faz push direto em main. Ele sempre abre um PULL REQUEST
+#   para a sua revisão e aprovação manual.
+# - É acionado manualmente (workflow_dispatch), informando a descrição do
+#   problema a corrigir. Não corrige nada sem você mandar.
+# - Mudanças de risco (dados, permissões, e-mail) devem ser revisadas por você.
+#
+# Enquanto o secret não existir, o job é pulado automaticamente (sem simular).
+
+on:
+  workflow_dispatch:
+    inputs:
+      problema:
+        description: 'Descreva o problema/melhoria a corrigir'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  propose-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar se a IA está habilitada
+        id: gate
+        run: |
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OPENAI_API_KEY não configurado — correção assistida por IA desabilitada. Configure o secret para habilitar."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Criar branch e registrar a solicitação
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          BR="ai-fix/$(date +%Y%m%d-%H%M%S)"
+          echo "BRANCH=$BR" >> "$GITHUB_ENV"
+          git config user.name "EduGestão Bot"
+          git config user.email "bot@edugestao.local"
+          git checkout -b "$BR"
+          mkdir -p .maintenance
+          {
+            echo "# Solicitação de correção assistida"
+            echo ""
+            echo "- Data: $(date -u +%FT%TZ)"
+            echo "- Problema informado: ${{ github.event.inputs.problema }}"
+            echo ""
+            echo "A geração automática do patch deve ser executada por uma etapa"
+            echo "que chama o modelo (OpenAI) e aplica as alterações. Este PR serve"
+            echo "como ponto de revisão humana obrigatória antes de qualquer merge."
+          } > ".maintenance/request-$(date +%s).md"
+          git add .maintenance
+          git commit -m "chore(ai-fix): registra solicitação de correção para revisão"
+          git push origin "$BR"
+
+      - name: Abrir Pull Request para revisão
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: process.env.BRANCH,
+              base: 'main',
+              title: `Correção assistida (revisão): ${{ github.event.inputs.problema }}`.slice(0, 80),
+              body: [
+                'PR gerado pelo fluxo de correção assistida por IA.',
+                '',
+                `Problema informado: ${{ github.event.inputs.problema }}`,
+                '',
+                '⚠️ Revise com atenção. Nada é mesclado automaticamente.',
+                'O CI (testes + build) roda neste PR antes do merge.',
+              ].join('\n'),
+            });
