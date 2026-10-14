@@ -19,6 +19,7 @@ import reportsRoutes from './routes/reports.js';
 import edugestaoRoutes from './routes/edugestao.js';
 import eventsRoutes from './routes/events.js';
 import centralRoutes from './routes/central.js';
+import activationRoutes from './routes/activation.js';
 import { seedAll } from './services/edugestao.js';
 
 migrate();
@@ -67,6 +68,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/edugestao', edugestaoRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/central', centralRoutes);
+app.use('/api/activation', activationRoutes);
 
 // API 404 handler (only for /api/* paths).
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));
@@ -92,7 +94,7 @@ const isMain = process.argv[1] && process.argv[1].endsWith('index.js');
 if (isMain) {
   app.listen(config.port, () => {
     log('info', 'scheduler', `Servidor iniciado na porta ${config.port}.`);
-    console.log(`Simula Escola IA backend em http://localhost:${config.port}`);
+    console.log(`EduGestão backend em http://localhost:${config.port}`);
     startScheduler();
   });
 }

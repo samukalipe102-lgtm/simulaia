@@ -1,8 +1,8 @@
 {
   "name": "simula-escola-ia-desktop",
-  "version": "2.1.0",
-  "description": "Simula Escola IA — aplicativo de desktop (Windows) via Electron.",
-  "author": "Simula Escola IA",
+  "version": "2.2.0",
+  "description": "EduGestão — aplicativo de desktop (Windows) via Electron.",
+  "author": "EduGestão",
   "repository": "https://github.com/samukalipe102-lgtm/simulaia",
   "_comment_version": "manter em sincronia com a tag de release (vX.Y.Z)",
   "main": "main.js",
@@ -18,7 +18,7 @@
   },
   "build": {
     "appId": "com.simulaescola.ia",
-    "productName": "Simula Escola IA",
+    "productName": "EduGestão",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -68,7 +68,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Simula Escola IA"
+      "shortcutName": "EduGestão"
     }
   }
 }

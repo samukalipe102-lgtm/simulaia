@@ -53,7 +53,7 @@ function ensureEnvFile(dataDir) {
   if (!fs.existsSync(envPath)) {
     const jwt = crypto.randomBytes(48).toString('hex');
     const content = [
-      '# Configuração local do Simula Escola IA (gerado automaticamente).',
+      '# Configuração local do EduGestão (gerado automaticamente).',
       '# As credenciais do Google podem ser preenchidas pela própria interface',
       '# (página "Integração com Gmail"), sem precisar editar este arquivo.',
       `PORT=${PORT}`,
@@ -166,7 +166,7 @@ function createMainWindow() {
     minHeight: 640,
     show: false,
     backgroundColor: '#f4f6fb',
-    title: 'Simula Escola IA',
+    title: 'EduGestão',
     icon: path.join(__dirname, 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

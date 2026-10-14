@@ -115,6 +115,16 @@ export function getSettings() {
   return db.prepare('SELECT * FROM settings WHERE id = 1').get();
 }
 
+// Destino das SOLICITAÇÕES geradas pela IA/automação.
+// Deve ser o Outlook oficial de atendimento (official_email); se não houver,
+// cai para o destinatário autorizado configurado.
+export function solicitationRecipient() {
+  const s = getSettings();
+  return (s.official_email && s.official_email.trim())
+    || (s.authorized_recipient && s.authorized_recipient.trim())
+    || '';
+}
+
 export function log(level, category, message, extra = {}) {
   db.prepare(
     `INSERT INTO activity_log (level, category, message, request_id, automation_id)

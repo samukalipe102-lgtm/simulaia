@@ -29,7 +29,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-900 to-brand-700 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-brand-900">EduGestão Atendimento</h1>
+          <h1 className="text-2xl font-bold text-brand-900">EduGestão</h1>
           <p className="text-sm text-slate-500 mt-1">Acesso administrativo</p>
         </div>
         <form onSubmit={submit} className="space-y-4">

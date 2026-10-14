@@ -19,6 +19,8 @@ const { db, migrate } = await import('../src/db/index.js');
 migrate();
 db.prepare("INSERT INTO services (name, category, enabled) VALUES ('Declaração','declaracao',1)").run();
 db.prepare("INSERT INTO profiles (name, role, fictitious, enabled) VALUES ('Maria Fictícia','responsavel',1,1)").run();
+// Destino das solicitações da IA = Outlook oficial (aqui apontado p/ o alvo do teste).
+db.prepare("UPDATE settings SET official_email='authorized@example.com' WHERE id=1").run();
 
 // Inject a fake Gmail transport (no real credentials needed).
 const gmail = await import('../src/services/gmail.js');
@@ -53,7 +55,7 @@ test('Flow: send returns REAL-style identifiers and stores thread/message ids', 
   assert.ok(sent.gmail_message_id);
   assert.ok(sent.gmail_thread_id);
   assert.equal(sent.status, 'awaiting_reply');
-  assert.equal(sent.recipient, 'authorized@example.com'); // test-mode forced
+  assert.equal(sent.recipient, 'authorized@example.com'); // Outlook oficial (official_email)
 });
 
 test('Flow: syncReplies imports an inbound reply and flags request replied', async () => {

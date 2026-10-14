@@ -168,7 +168,7 @@ test('Modo real: e-mail enviado NÃO contém marcadores de simulação', async (
 test('Envio automático ponta a ponta: tick gera e envia ao destinatário autorizado', async () => {
   // Simula tudo pronto: auto_mode on, automação ativa, destinatário definido,
   // Gmail "conectado" (transporte mockado já injetado no topo do arquivo).
-  db.prepare(`UPDATE settings SET auto_mode=1, test_mode=1, authorized_recipient='authorized@example.com', emergency_stop=0 WHERE id=1`).run();
+  db.prepare(`UPDATE settings SET auto_mode=1, test_mode=1, official_email='authorized@example.com', authorized_recipient='authorized@example.com', emergency_stop=0 WHERE id=1`).run();
   // garante uma automação ativa, sem travas de janela/intervalo
   db.prepare(
     `INSERT INTO automations (name, status, max_per_day, interval_minutes, allowed_days, start_hour, end_hour, auto_followup)
