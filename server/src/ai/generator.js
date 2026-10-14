@@ -87,11 +87,13 @@ export function generateRequestContent(opts = {}) {
   const closer = pick(CLOSERS, rnd);
 
   const serviceName = service?.name || 'um esclarecimento escolar';
-  const refNote = profile?.context ? ` ${profile.context}` : '';
 
   // realMode = true → mensagem profissional (sem marcadores de simulação).
   // realMode = false → mantém marcador discreto de teste (segurança no setup).
   const realMode = opts?.realMode ?? false;
+  // O "context" do perfil é anotação INTERNA (ex.: "simulado para teste"); nunca
+  // deve entrar em e-mails reais. Só é usado fora do modo real.
+  const refNote = !realMode && profile?.context ? ` ${profile.context}` : '';
   const senderName = profile?.name || 'Solicitante';
 
   const subject = realMode ? subjectBase : `[SIMULAÇÃO] ${subjectBase}`;

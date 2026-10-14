@@ -14,11 +14,10 @@ const services = [
 ];
 
 const profiles = [
-  ['Maria Fictícia', 'responsavel', 'Responsável simulado(a) para teste.'],
-  ['João Simulado', 'responsavel', 'Responsável simulado(a) para teste.'],
-  ['Prof. Teste', 'professor', 'Docente simulado(a) para teste.'],
-  ['Coord. Exemplo', 'coordenador', 'Coordenação simulada para teste.'],
-  ['Func. Demonstração', 'funcionario', 'Funcionário(a) simulado(a) para teste.'],
+  ['Responsável', 'responsavel', ''],
+  ['Professor(a)', 'professor', ''],
+  ['Coordenação', 'coordenador', ''],
+  ['Secretaria', 'funcionario', ''],
 ];
 
 const svcCount = db.prepare('SELECT COUNT(*) AS c FROM services').get().c;

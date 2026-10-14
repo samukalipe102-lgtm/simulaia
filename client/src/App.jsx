@@ -12,6 +12,7 @@ import Documents from './pages/Documents.jsx';
 import AdminAutomation from './pages/AdminAutomation.jsx';
 import Gmail from './pages/Gmail.jsx';
 import Settings from './pages/Settings.jsx';
+import Updates from './pages/Updates.jsx';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/respostas" element={<Protected><Sent /></Protected>} />
       <Route path="/documentos" element={<Protected><Documents /></Protected>} />
       <Route path="/automacao" element={<Protected><AdminAutomation /></Protected>} />
+      <Route path="/novidades" element={<Protected><Updates /></Protected>} />
       <Route path="/gmail" element={<Protected><Gmail /></Protected>} />
       <Route path="/configuracoes" element={<Protected><Settings /></Protected>} />
       {/* Compatibilidade com rotas antigas */}

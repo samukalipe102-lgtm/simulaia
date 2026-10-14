@@ -79,8 +79,9 @@ test('Assinaturas: seed cria assinaturas EduGestão com e-mail institucional', (
   const atendimento = list.find((s) => s.sector === 'atendimento');
   assert.ok(atendimento);
   assert.equal(atendimento.is_default, 1);
-  assert.match(atendimento.body, /adminedugestao@gmail\.com/);
-  assert.match(atendimento.body, /EduGestão/);
+  // A assinatura padrão usa o e-mail oficial do Outlook.
+  assert.match(atendimento.body, /admsedugestao@outlook\.com/);
+  assert.match(atendimento.body, /EduGestão — Gestão e Atendimento Escolar/);
 });
 
 test('Assinatura: aplicada ao corpo e sem duplicar quando reaplicada', () => {
@@ -114,4 +115,13 @@ test('Modo profissional: acompanhamento sem rodapé de simulação', () => {
   const real = gen.generateFollowUp({ request, lastInbound: { body: 'ok' }, realMode: true });
   assert.doesNotMatch(real.body, /perfil fictício|Acompanhamento fictício|simulação/i);
   assert.equal(real.fictitious, false);
+});
+
+test('E-mail real NÃO contém "simulado/teste/fictício" mesmo com context no perfil', async () => {
+  const service = { name: 'Declaração de matrícula', category: 'declaracao' };
+  // perfil com anotação interna de teste (não deve vazar no e-mail real)
+  const profile = { name: 'Responsável', role: 'responsavel', context: 'Responsável simulado(a) para teste.' };
+  const real = gen.generateRequestContent({ service, profile, seed: 3, realMode: true });
+  assert.doesNotMatch(real.body, /simulad|para teste|fict[íi]cio|demonstra[çc][ãa]o/i);
+  assert.ok(!real.subject.includes('[SIMULAÇÃO]'));
 });

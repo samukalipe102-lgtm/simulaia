@@ -4,5 +4,5 @@ const { contextBridge } = require('electron');
 
 contextBridge.exposeInMainWorld('simulaDesktop', {
   isDesktop: true,
-  version: '2.2.0',
+  version: '2.3.0',
 });
