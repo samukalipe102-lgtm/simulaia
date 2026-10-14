@@ -39,7 +39,12 @@ mas nada que afete e-mail/dados/permissões é publicado sem sua aprovação.
 1. Gere uma chave em https://platform.openai.com/api-keys (há custo por uso).
 2. No GitHub: **Settings → Secrets and variables → Actions → New repository secret**.
 3. Nome: `OPENAI_API_KEY` · Valor: sua chave. Salvar.
-4. Pronto — o workflow passa a aceitar execuções e abrir PRs de correção.
+4. **(Opcional, para o PR abrir sozinho)** Em **Settings → Actions → General →
+   Workflow permissions**, marque **"Allow GitHub Actions to create and approve
+   pull requests"**. Sem isso, o GitHub bloqueia a criação automática de PRs por
+   segurança — o workflow então **não falha**: ele envia a branch e publica um
+   **link pronto** para você abrir o PR com um clique (veja o resumo da execução
+   em Actions → a run → "Abrir PR: …").
 
 > Dica: você pode manter apenas o **Nível 1** (grátis e seguro) e continuar
 > pedindo correções específicas pelo chat, que eu abro o PR, testo e publico.
