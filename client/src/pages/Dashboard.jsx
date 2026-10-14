@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useEvents } from '../hooks/useEvents.js';
 import { Card, CardHeader, StatusBadge, Button, Spinner } from '../components/ui.jsx';
+import ActivationPanel from '../components/ActivationPanel.jsx';
 
 function dt(ts) { return ts ? new Date((ts || '').replace(' ', 'T') + 'Z').toLocaleString('pt-BR') : '—'; }
 
@@ -42,6 +43,9 @@ export default function Dashboard() {
         </div>
         {!gmail.connected && <Button onClick={() => navigate('/gmail')}>Conectar Gmail</Button>}
       </div>
+
+      {/* Botão de ativação e teste real */}
+      <ActivationPanel />
 
       {/* 4 indicadores principais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

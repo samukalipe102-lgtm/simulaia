@@ -15,6 +15,7 @@
     "test:auto": "bash tests/e2e-auto.sh",
     "test:edu": "bash tests/e2e-edugestao.sh",
     "test:central": "bash tests/e2e-central.sh",
+    "test:activation": "bash tests/e2e-activation.sh",
     "verify:env": "bash tests/verify-env.sh"
   },
   "engines": {

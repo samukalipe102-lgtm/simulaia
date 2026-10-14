@@ -3,7 +3,7 @@
 // test mode. This logic is driven by the server-side scheduler (jobs/scheduler.js)
 // and does NOT depend on any browser being open.
 
-import { db, log, getSettings } from '../db/index.js';
+import { db, log, getSettings, solicitationRecipient } from '../db/index.js';
 import { createSimulatedRequest, sendRequest, isDuplicate } from './requests.js';
 
 function parseList(str) {
@@ -86,12 +86,11 @@ export async function runAutomationStep(automationId) {
   if (!check.ok) return { skipped: true, reason: check.reason };
 
   const settings = getSettings();
-  const recipient = settings.test_mode
-    ? settings.authorized_recipient
-    : automation.recipient || settings.authorized_recipient;
+  // Solicitações da IA vão para o Outlook oficial de atendimento.
+  const recipient = automation.recipient || solicitationRecipient();
 
   if (!recipient) {
-    log('warn', 'automation', `Automação ${automation.name} sem destinatário autorizado.`, {
+    log('warn', 'automation', `Automação ${automation.name} sem e-mail de destino (Outlook).`, {
       automationId,
     });
     return { skipped: true, reason: 'no_recipient' };

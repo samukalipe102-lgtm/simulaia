@@ -13,17 +13,20 @@ import cron from 'node-cron';
 import { getSettings, log } from '../db/index.js';
 import { syncInbox } from '../services/inbox.js';
 import { processQueueStep } from '../services/adminQueue.js';
+import { listActiveAutomations, runAutomationStep, updateNextRun } from '../services/automation.js';
 import { emitEvent } from '../services/events.js';
 import { gmailConfigured } from '../config.js';
 
 let syncRunning = false;
 let queueRunning = false;
+let genRunning = false;
 let tasks = [];
 
 const runtime = {
   startedAt: null,
   lastSyncAt: null,
   lastQueueAt: null,
+  lastGenAt: null,
   lastError: null,
 };
 export function getRuntime() {
@@ -77,11 +80,40 @@ async function queueTick() {
   }
 }
 
+// Geração automática de SOLICITAÇÕES pela IA, enviadas ao Outlook oficial.
+// Só roda quando o administrador ATIVA a IA (settings.auto_mode = 1) e respeita
+// as regras de cada automação (limite diário, intervalo, janela).
+async function genTick() {
+  if (genRunning) return;
+  const settings = getSettings();
+  if (settings.emergency_stop) return;
+  if (!settings.auto_mode) return;            // IA desligada → não gera nada
+  if (!gmailConfigured(settings)) return;     // precisa do Gmail conectado p/ enviar
+
+  genRunning = true;
+  try {
+    for (const automation of listActiveAutomations()) {
+      const result = await runAutomationStep(automation.id);
+      if (result.sent || result.error) {
+        updateNextRun(automation.id);
+        emitEvent(result.sent ? 'request_sent' : 'request_error', { automationId: automation.id, requestId: result.requestId });
+      }
+    }
+    runtime.lastGenAt = new Date().toISOString();
+  } catch (err) {
+    runtime.lastError = err.message;
+    log('error', 'scheduler', `Erro na geração de solicitações: ${err.message}`);
+  } finally {
+    genRunning = false;
+  }
+}
+
 export function startScheduler() {
   runtime.startedAt = new Date().toISOString();
   tasks.push(cron.schedule('* * * * *', syncTick));   // sincronização da caixa
   tasks.push(cron.schedule('* * * * *', queueTick));  // fila administrativa (1/tick)
-  log('info', 'scheduler', 'Agendador iniciado (sincronização de caixa + fila administrativa).');
+  tasks.push(cron.schedule('* * * * *', genTick));    // IA gera e envia ao Outlook
+  log('info', 'scheduler', 'Agendador iniciado (sincronização + fila + geração IA).');
 }
 
 export function stopScheduler() {
@@ -89,4 +121,4 @@ export function stopScheduler() {
   tasks = [];
 }
 
-export { syncTick, queueTick };
+export { syncTick, queueTick, genTick };

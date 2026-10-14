@@ -1,7 +1,7 @@
 // Core service: generate simulated requests, send them, detect replies, and
 // draft follow-ups (which require approval before sending).
 
-import { db, log, getSettings } from '../db/index.js';
+import { db, log, getSettings, solicitationRecipient } from '../db/index.js';
 import {
   generateRequestContent,
   generateWithLLM,
@@ -86,7 +86,7 @@ export async function createSimulatedRequest(opts = {}) {
   const llm = await generateWithLLM({ service, profile: genProfile, realMode }).catch(() => null);
   const content = llm || generateRequestContent({ service, profile: genProfile, realMode });
 
-  const dest = recipient || settings.authorized_recipient || null;
+  const dest = recipient || solicitationRecipient() || null;
   const publicId = nextPublicId();
 
   const info = db
@@ -143,17 +143,11 @@ export async function sendRequest(requestId) {
   if (!request) throw new Error('Solicitação não encontrada.');
 
   const settings = getSettings();
-  let recipient = request.recipient || settings.authorized_recipient;
+  // As solicitações geradas pela IA são enviadas ao Outlook oficial de
+  // atendimento. Prioridade: destino já gravado no processo → Outlook oficial.
+  let recipient = request.recipient || solicitationRecipient();
   if (!recipient) {
-    throw new Error('Nenhum destinatário autorizado configurado.');
-  }
-
-  // Test-mode safety: force the single authorized recipient.
-  if (settings.test_mode) {
-    if (!settings.authorized_recipient) {
-      throw new Error('Modo de teste ativo mas nenhum destinatário autorizado definido.');
-    }
-    recipient = settings.authorized_recipient;
+    throw new Error('Nenhum destinatário configurado (defina o e-mail oficial do Outlook).');
   }
 
   if (isDuplicate(request.subject, recipient)) {
@@ -327,10 +321,8 @@ export function draftFollowUp(requestId) {
 // Internal: actually send a pending follow-up message in the correct thread.
 // Shared by manual approval and the autonomous engine.
 async function sendFollowUpMessage(msg, request) {
-  const settings = getSettings();
-  let recipient = request.recipient || settings.authorized_recipient;
-  if (settings.test_mode) recipient = settings.authorized_recipient; // safety
-  if (!recipient) throw new Error('Nenhum destinatário autorizado configurado.');
+  let recipient = request.recipient || solicitationRecipient();
+  if (!recipient) throw new Error('Nenhum destinatário configurado (defina o e-mail do Outlook).');
 
   const bodyWithSignature = applySignature(msg.body);
   const sent = await gmail.sendEmail({

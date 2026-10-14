@@ -44,6 +44,9 @@ jobs:
       - name: Testes end-to-end da central (processos/caixa/automação)
         run: npm run test:central
 
+      - name: Testes end-to-end da ativação (botão ATIVAR E TESTAR)
+        run: npm run test:activation
+
       - name: Build do frontend (para o teste de serviço único)
         working-directory: client
         run: npm ci && npm run build
