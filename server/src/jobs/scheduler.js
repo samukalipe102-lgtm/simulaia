@@ -14,6 +14,7 @@ import { getSettings, log } from '../db/index.js';
 import { syncInbox } from '../services/inbox.js';
 import { processQueueStep } from '../services/adminQueue.js';
 import { listActiveAutomations, runAutomationStep, updateNextRun } from '../services/automation.js';
+import { monitorTick } from '../services/monitor.js';
 import { emitEvent } from '../services/events.js';
 import { gmailConfigured } from '../config.js';
 
@@ -113,7 +114,8 @@ export function startScheduler() {
   tasks.push(cron.schedule('* * * * *', syncTick));   // sincronização da caixa
   tasks.push(cron.schedule('* * * * *', queueTick));  // fila administrativa (1/tick)
   tasks.push(cron.schedule('* * * * *', genTick));    // IA gera e envia ao Outlook
-  log('info', 'scheduler', 'Agendador iniciado (sincronização + fila + geração IA).');
+  tasks.push(cron.schedule('*/10 * * * *', monitorTick)); // monitor de saúde (10 min)
+  log('info', 'scheduler', 'Agendador iniciado (sincronização + fila + geração IA + monitor).');
 }
 
 export function stopScheduler() {

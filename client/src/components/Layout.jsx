@@ -10,6 +10,7 @@ const NAV = [
   { to: '/respostas', label: 'Respostas enviadas', icon: '↩️' },
   { to: '/documentos', label: 'Documentos', icon: '📎' },
   { to: '/automacao', label: 'Automação', icon: '⚙️' },
+  { to: '/novidades', label: 'O que há de novo?', icon: '✨' },
   { to: '/configuracoes', label: 'Configurações', icon: '🔐' },
 ];
 

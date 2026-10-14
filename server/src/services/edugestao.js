@@ -120,16 +120,20 @@ export function seedSignatures() {
   const count = db.prepare('SELECT COUNT(*) AS c FROM signatures').get().c;
   if (count > 0) return { seeded: 0 };
   const settings = getSettings();
-  const email = settings.institution_email || 'adminedugestao@gmail.com';
-  // Rodapé institucional fixo conforme a assinatura padrão especificada.
-  const mk = (display, sectorLabel) =>
-    `${display}\n${sectorLabel}\nE-mail: ${email}\nEduGestão — Gestão e Atendimento Escolar`;
+  // E-mail da assinatura = Outlook oficial de atendimento.
+  const email = settings.official_email || 'admsedugestao@outlook.com';
+  // Assinatura padrão (formato exato solicitado):
+  //   <Setor>
+  //   EduGestão — Gestão e Atendimento Escolar
+  //   E-mail: <outlook>
+  const mk = (display) =>
+    `${display}\nEduGestão — Gestão e Atendimento Escolar\nE-mail: ${email}`;
 
   const rows = [
-    ['atendimento', 'Atendimento Escolar', mk('Atendimento Escolar', 'Setor de Atendimento Escolar'), 1],
-    ['secretaria', 'Secretaria Escolar', mk('Secretaria Escolar', 'Setor de Secretaria Escolar'), 0],
-    ['coordenacao', 'Coordenação', mk('Coordenação', 'Setor de Coordenação Pedagógica'), 0],
-    ['direcao', 'Direção', mk('Direção', 'Direção'), 0],
+    ['atendimento', 'Atendimento Escolar', mk('Atendimento Escolar'), 1],
+    ['secretaria', 'Secretaria Escolar', mk('Secretaria Escolar'), 0],
+    ['coordenacao', 'Coordenação', mk('Coordenação'), 0],
+    ['direcao', 'Direção', mk('Direção'), 0],
   ];
   const stmt = db.prepare(
     'INSERT INTO signatures (sector, display_name, body, is_default, enabled) VALUES (?, ?, ?, ?, 1)',

@@ -157,11 +157,10 @@ router.post('/setup', (req, res) => {
   const profCount = db.prepare('SELECT COUNT(*) AS c FROM profiles').get().c;
   if (profCount === 0) {
     const profiles = [
-      ['Maria Fictícia', 'responsavel', 'Responsável simulado(a) para teste.'],
-      ['João Simulado', 'responsavel', 'Responsável simulado(a) para teste.'],
-      ['Prof. Teste', 'professor', 'Docente simulado(a) para teste.'],
-      ['Coord. Exemplo', 'coordenador', 'Coordenação simulada para teste.'],
-      ['Func. Demonstração', 'funcionario', 'Funcionário(a) simulado(a) para teste.'],
+      ['Responsável', 'responsavel', ''],
+      ['Professor(a)', 'professor', ''],
+      ['Coordenação', 'coordenador', ''],
+      ['Secretaria', 'funcionario', ''],
     ];
     const stmt = db.prepare('INSERT INTO profiles (name, role, context, fictitious, enabled) VALUES (?, ?, ?, 1, 1)');
     profiles.forEach((p) => stmt.run(...p));

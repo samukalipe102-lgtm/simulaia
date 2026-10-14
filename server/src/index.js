@@ -20,6 +20,7 @@ import edugestaoRoutes from './routes/edugestao.js';
 import eventsRoutes from './routes/events.js';
 import centralRoutes from './routes/central.js';
 import activationRoutes from './routes/activation.js';
+import updatesRoutes from './routes/updates.js';
 import { seedAll } from './services/edugestao.js';
 
 migrate();
@@ -69,6 +70,7 @@ app.use('/api/edugestao', edugestaoRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/central', centralRoutes);
 app.use('/api/activation', activationRoutes);
+app.use('/api/updates', updatesRoutes);
 
 // API 404 handler (only for /api/* paths).
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));

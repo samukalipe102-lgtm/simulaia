@@ -46,6 +46,8 @@ export function migrate() {
   // intenção — o encaminhamento real é feito por regra nativa do Outlook).
   ensureColumn('settings', 'forwarding_enabled', 'INTEGER NOT NULL DEFAULT 1');
   ensureColumn('settings', 'response_copy_enabled', 'INTEGER NOT NULL DEFAULT 1');
+  // "O que há de novo?": última versão vista pelo administrador.
+  ensureColumn('settings', 'last_seen_version', 'TEXT');
 
   // Full-automation settings (single setup + autonomous operation).
   ensureColumn('settings', 'setup_completed', 'INTEGER NOT NULL DEFAULT 0');
